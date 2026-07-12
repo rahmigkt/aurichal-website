@@ -51,6 +51,10 @@
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
   @media (max-width:640px){ .grid2{grid-template-columns:1fr;} }
   .topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+.cf-row{display:flex; gap:8px; align-items:center;}
+.cf-row input{flex:1; background:var(--bg); border:1px solid var(--hairline-strong); color:var(--ink); padding:9px 10px; font-family:'IBM Plex Sans',sans-serif; font-size:13px;}
+.cf-row button{background:none; border:1px solid var(--hairline-strong); color:var(--label); font-size:11px; padding:8px 10px; cursor:pointer; font-family:'Space Mono',monospace; flex-shrink:0;}
+.cf-row button:hover{border-color:#e07a5f; color:#e07a5f;}
   .who{font-family:'Space Mono',monospace; font-size:12px; color:var(--label);}
 </style>
 </head>
@@ -125,7 +129,12 @@
       <div class="field"><label>Teknik</label><input type="text" id="prodTechnique" placeholder="örn. Dövme, Kalemkâri"></div>
       <div class="field"><label>Açıklama</label><textarea id="prodDesc" placeholder="Ürün açıklaması"></textarea></div>
       <div class="field"><label>Ürün Görseli</label><input type="file" id="prodImage" accept="image/*"></div>
-      <button class="btn btn-solid" id="saveProdBtn">Kaydet</button>
+      <div class="field">
+        <label>Ek Özel Alanlar (istediğin kadar ekleyebilirsin)</label>
+        <div id="customFieldsList" style="display:flex; flex-direction:column; gap:8px; margin-top:4px;"></div>
+        <button type="button" class="btn btn-line" id="addCustomFieldBtn" style="margin-top:10px; align-self:flex-start; font-size:12px; padding:9px 14px;">+ Alan Ekle</button>
+      </div>
+      <button class="btn btn-solid" id="saveProdBtn" style="margin-top:8px;">Kaydet</button>
       <button class="btn btn-line" id="cancelProdBtn" style="display:none;">İptal</button>
       <div class="msg" id="prodMsg"></div>
     </div>
@@ -186,7 +195,8 @@ const CONTENT_LABELS = {
   contact_phone: 'Telefon',
   contact_email: 'E-posta',
   contact_workshop: 'Atölye Konumu',
-  contact_office: 'Ofis Konumu'
+  contact_office: 'Ofis Konumu',
+  gallery_mode: 'Ana Sayfa Galeri Sırası'
 };
 async function loadContent(){
   const { data } = await sb.from('aurichal_site_content').select('*');
@@ -196,12 +206,23 @@ async function loadContent(){
   order.forEach(key => {
     const row = (data||[]).find(r => r.key === key);
     const isLong = key.startsWith('manifesto');
+    const isGalleryMode = key === 'gallery_mode';
+    const currentVal = row ? row.value : '';
     const field = document.createElement('div');
     field.className = 'field';
     field.style.marginBottom = '18px';
-    field.innerHTML = '<label>'+CONTENT_LABELS[key]+'</label>' +
-      (isLong ? '<textarea data-key="'+key+'">'+escapeHtml(row?row.value:'')+'</textarea>'
-               : '<input type="text" data-key="'+key+'" value="'+escapeHtml(row?row.value:'')+'">');
+    let inputHtml;
+    if (isGalleryMode) {
+      inputHtml = '<select data-key="gallery_mode">' +
+        '<option value="random"'+(currentVal==='random'?' selected':'')+'>Karışık (her ziyarette farklı sırada)</option>' +
+        '<option value="sequential"'+(currentVal==='sequential'?' selected':'')+'>Sıralı (eklendiği sırayla)</option>' +
+        '</select>';
+    } else if (isLong) {
+      inputHtml = '<textarea data-key="'+key+'">'+escapeHtml(currentVal)+'</textarea>';
+    } else {
+      inputHtml = '<input type="text" data-key="'+key+'" value="'+escapeHtml(currentVal)+'">';
+    }
+    field.innerHTML = '<label>'+CONTENT_LABELS[key]+'</label>' + inputHtml;
     wrap.appendChild(field);
   });
 }
@@ -297,6 +318,29 @@ document.getElementById('saveCatBtn').onclick = async () => {
   loadCategories();
 };
 
+// ---------- ÖZEL ALANLAR (customFields) ----------
+function addCustomFieldRow(label, value){
+  const list = document.getElementById('customFieldsList');
+  const row = document.createElement('div');
+  row.className = 'cf-row';
+  row.innerHTML =
+    '<input type="text" placeholder="Alan adı (örn. Ölçü)" class="cf-label" value="'+escapeHtml(label||'')+'">' +
+    '<input type="text" placeholder="Değer (örn. 45 cm)" class="cf-value" value="'+escapeHtml(value||'')+'">' +
+    '<button type="button">Sil</button>';
+  row.querySelector('button').onclick = () => row.remove();
+  list.appendChild(row);
+}
+document.getElementById('addCustomFieldBtn').onclick = () => addCustomFieldRow('', '');
+function getCustomFieldsFromForm(){
+  return Array.from(document.querySelectorAll('#customFieldsList .cf-row')).map(row => ({
+    label: row.querySelector('.cf-label').value.trim(),
+    value: row.querySelector('.cf-value').value.trim()
+  })).filter(f => f.label);
+}
+function clearCustomFieldsForm(){
+  document.getElementById('customFieldsList').innerHTML = '';
+}
+
 // ---------- ÜRÜNLER ----------
 let editingProdId = null;
 async function loadProducts(){
@@ -326,6 +370,8 @@ function editProduct(p){
   document.getElementById('prodMaterial').value = p.material || '';
   document.getElementById('prodTechnique').value = p.technique || '';
   document.getElementById('prodDesc').value = p.description || '';
+  clearCustomFieldsForm();
+  (Array.isArray(p.custom_fields) ? p.custom_fields : []).forEach(f => addCustomFieldRow(f.label, f.value));
   document.getElementById('cancelProdBtn').style.display = 'inline-flex';
 }
 document.getElementById('cancelProdBtn').onclick = () => resetProdForm();
@@ -334,6 +380,7 @@ function resetProdForm(){
   document.getElementById('prodFormTitle').textContent = 'Yeni Ürün Ekle';
   ['prodId','prodTitle','prodSlug','prodMaterial','prodTechnique','prodDesc'].forEach(id => document.getElementById(id).value='');
   document.getElementById('prodImage').value = '';
+  clearCustomFieldsForm();
   document.getElementById('cancelProdBtn').style.display = 'none';
 }
 document.getElementById('prodTitle').addEventListener('input', (e) => {
@@ -365,7 +412,8 @@ document.getElementById('saveProdBtn').onclick = async () => {
     category_id: document.getElementById('prodCategory').value || null,
     material: document.getElementById('prodMaterial').value,
     technique: document.getElementById('prodTechnique').value,
-    description: document.getElementById('prodDesc').value
+    description: document.getElementById('prodDesc').value,
+    custom_fields: getCustomFieldsFromForm()
   };
   if (image_url) payload.image_url = image_url;
 
