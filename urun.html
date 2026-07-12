@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ürün — AURICHAL</title>
+<link rel="icon" href="assets/logo/mark-copper.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/brand.css">
+<style>
+  .product-page{padding:150px 0 100px;}
+  .breadcrumb{font-family:'Space Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--label); margin-bottom:36px;}
+  .breadcrumb a{color:var(--brass-light); text-decoration:none;}
+  .product-layout{display:grid; grid-template-columns:1.1fr 0.9fr; gap:60px; align-items:start;}
+  .product-image{aspect-ratio:1/1; background:var(--bg-panel); border:1px solid var(--hairline); overflow:hidden; display:flex; align-items:center; justify-content:center;}
+  .product-image img{width:100%; height:100%; object-fit:cover;}
+  .product-image svg{width:35%; height:35%; stroke:var(--brass); fill:none; stroke-width:1.2;}
+  .product-info h1{font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:clamp(30px,4vw,44px); margin:0 0 20px; letter-spacing:-0.01em;}
+  .product-info .desc{color:var(--ink-dim); font-size:17px; line-height:1.75; margin-bottom:36px;}
+  .p-specs{border-top:1px solid var(--hairline); margin-bottom:36px;}
+  .p-spec-row{display:flex; justify-content:space-between; padding:16px 0; border-bottom:1px solid var(--hairline); font-size:14px;}
+  .p-spec-row .k{font-family:'Space Mono', monospace; letter-spacing:0.06em; text-transform:uppercase; color:var(--label); font-size:12px;}
+  .p-spec-row .v{color:var(--ink);}
+  @media (max-width:860px){ .product-layout{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="navbar">
+    <a href="index.html" class="wordmark"><img src="assets/logo/mark-copper.png" alt="Aurichal"> AURICHAL</a>
+    <div class="navlinks">
+      <a href="index.html#koleksiyon">Koleksiyon</a>
+      <a href="index.html#manifesto">Manifesto</a>
+      <a href="index.html#iletisim" class="cta-link">Teklif Al</a>
+    </div>
+  </div>
+</header>
+
+<section class="product-page">
+  <div class="wrap">
+    <div class="breadcrumb" id="breadcrumb"><a href="index.html">Ana Sayfa</a> / <span id="bcCat"></span> / <span id="bcProduct"></span></div>
+    <div class="product-layout" id="layout">
+      <div class="product-image skeleton"></div>
+      <div class="product-info">
+        <div class="skeleton" style="height:40px;width:70%;margin-bottom:20px;"></div>
+        <div class="skeleton" style="height:100px;"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <span class="foot-word">AURICHAL</span>
+    <span class="foot-meta">Handcrafted Brass &amp; Copper</span>
+    <span class="foot-meta">© 2026 Aurichal</span>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/shared.js"></script>
+<script>
+async function init(){
+  const params = new URLSearchParams(location.search);
+  const slug = params.get('slug');
+  const layout = document.getElementById('layout');
+  if (!slug) { layout.innerHTML = '<p>Ürün bulunamadı.</p>'; return; }
+
+  const { data: p, error } = await sb.from('aurichal_products').select('*, aurichal_categories(name, slug)').eq('slug', slug).maybeSingle();
+  if (error || !p) { layout.innerHTML = '<p>Bu ürün mevcut değil.</p>'; return; }
+
+  document.title = p.title + ' — AURICHAL';
+  const cat = p.aurichal_categories;
+  if (cat) {
+    document.getElementById('bcCat').innerHTML = '<a href="kategori.html?slug='+encodeURIComponent(cat.slug)+'" style="color:var(--brass-light);text-decoration:none;">'+escapeHtml(cat.name)+'</a>';
+  }
+  document.getElementById('bcProduct').textContent = p.title;
+
+  const img = publicImageUrl(p.image_url);
+  const media = img
+    ? '<img src="'+img+'" alt="'+escapeHtml(p.title)+'">'
+    : categoryIcon(cat ? cat.slug : 'default');
+
+  let specsHtml = '';
+  if (p.material) specsHtml += '<div class="p-spec-row"><span class="k">Malzeme</span><span class="v">'+escapeHtml(p.material)+'</span></div>';
+  if (p.technique) specsHtml += '<div class="p-spec-row"><span class="k">Teknik</span><span class="v">'+escapeHtml(p.technique)+'</span></div>';
+
+  layout.innerHTML =
+    '<div class="product-image">'+media+'</div>'+
+    '<div class="product-info">'+
+      '<h1>'+escapeHtml(p.title)+'</h1>'+
+      (p.description ? '<div class="desc">'+escapeHtml(p.description)+'</div>' : '')+
+      (specsHtml ? '<div class="p-specs">'+specsHtml+'</div>' : '')+
+      '<a href="index.html#iletisim" class="btn btn-solid">Teklif İste →</a>'+
+    '</div>';
+}
+init();
+</script>
+</body>
+</html>
