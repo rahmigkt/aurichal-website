@@ -44,7 +44,7 @@ header{
   padding:20px 32px;
 }
 .wordmark{display:flex; align-items:center; gap:12px; text-decoration:none; color:var(--ink);}
-.wordmark img{height:26px; width:auto; display:block;}
+.wordmark img{height:44px; width:auto; display:block;}
 .navlinks{display:flex; align-items:center; gap:36px; font-size:14px;}
 .navlinks a{text-decoration:none; color:var(--ink-dim); letter-spacing:0.02em; transition:color .2s;}
 .navlinks a:hover{color:var(--brass-light);}
