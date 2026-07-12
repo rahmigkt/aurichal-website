@@ -22,19 +22,36 @@
   .hero-bg-fade{position:absolute; inset:0; z-index:1; background:radial-gradient(circle at 78% 46%, rgba(176,138,70,0.10), transparent 60%);}
   @media (max-width:900px){ .hero-grid{grid-template-columns:1fr;} .hero-visual{order:-1; max-width:220px; margin:0 auto 20px;} }
 
+  .featured-banner{padding:0 0 0; }
+  .featured-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:2px; background:var(--hairline);}
+  .feat-tile{position:relative; aspect-ratio:4/3; overflow:hidden; background:var(--bg-panel); text-decoration:none; display:block;}
+  .feat-tile img{width:100%; height:100%; object-fit:cover; display:block; transition:transform .5s;}
+  .feat-tile:hover img{transform:scale(1.04);}
+  .feat-tile .feat-icon{width:100%; height:100%; display:flex; align-items:center; justify-content:center;}
+  .feat-tile .feat-icon svg{width:26%; height:26%; stroke:var(--brass); fill:none; stroke-width:1.2;}
+  .feat-tile .feat-label{position:absolute; left:0; right:0; bottom:0; padding:20px 22px; background:linear-gradient(to top, rgba(20,18,15,0.88), transparent); font-family:'Space Grotesk', sans-serif; font-size:16px; font-weight:600; color:var(--ink);}
+  @media (max-width:860px){ .featured-grid{grid-template-columns:1fr;} }
+
   .gallery-section{background:var(--bg-panel); border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline);}
-  .gallery-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; background:var(--hairline); border:1px solid var(--hairline);}
-  .g-card{background:var(--bg); text-decoration:none; color:var(--ink); display:block;}
-  .g-card:hover{background:var(--bg-panel-2);}
-  .g-card .img-wrap{aspect-ratio:1/1; background:var(--bg-panel); overflow:hidden;}
-  .g-card .img-wrap img{width:100%; height:100%; object-fit:cover; display:block;}
-  .g-icon{width:100%; height:100%; display:flex; align-items:center; justify-content:center;}
-  .g-icon svg{width:32%; height:32%; stroke:var(--brass); fill:none; stroke-width:1.3;}
-  .g-body{padding:16px 18px 20px;}
-  .g-card h4{font-family:'Space Grotesk', sans-serif; font-size:15px; font-weight:600; margin:0 0 4px;}
-  .g-card .g-tag{font-family:'Space Mono', monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--label);}
-  @media (max-width:860px){ .gallery-grid{grid-template-columns:1fr 1fr;} }
-  @media (max-width:520px){ .gallery-grid{grid-template-columns:1fr;} }
+  .carousel{position:relative; border:1px solid var(--hairline); background:var(--bg); min-height:440px;}
+  .carousel-track{position:relative; min-height:440px;}
+  .c-slide{position:absolute; inset:0; display:grid; grid-template-columns:1fr 1fr; opacity:0; transition:opacity .7s ease; pointer-events:none;}
+  .c-slide.active{opacity:1; pointer-events:auto;}
+  .c-slide .c-img{background:var(--bg-panel); overflow:hidden;}
+  .c-slide .c-img img{width:100%; height:100%; object-fit:cover; display:block;}
+  .c-slide .c-icon{width:100%; height:100%; display:flex; align-items:center; justify-content:center;}
+  .c-slide .c-icon svg{width:28%; height:28%; stroke:var(--brass); fill:none; stroke-width:1.2;}
+  .c-info{padding:48px; display:flex; flex-direction:column; justify-content:center;}
+  .c-info h3{font-family:'Space Grotesk', sans-serif; font-size:clamp(24px,3vw,32px); font-weight:600; margin:0 0 16px;}
+  .c-info p{color:var(--ink-dim); font-size:15px; line-height:1.7; margin:0 0 20px;}
+  .c-facts{display:flex; flex-direction:column; gap:8px; margin-bottom:24px;}
+  .c-fact{display:flex; gap:12px; font-size:13px;}
+  .c-fact .k{font-family:'Space Mono', monospace; letter-spacing:0.08em; text-transform:uppercase; color:var(--label); min-width:90px;}
+  .c-fact .v{color:var(--ink);}
+  @media (max-width:760px){ .c-slide{grid-template-columns:1fr;} .carousel, .carousel-track{min-height:auto;} .c-slide .c-img{aspect-ratio:4/3;} .c-info{padding:32px 26px;} }
+  .carousel-dots{display:flex; gap:8px; justify-content:center; padding:20px 0;}
+  .c-dot{width:8px; height:8px; border-radius:50%; background:var(--hairline-strong); border:none; cursor:pointer; padding:0;}
+  .c-dot.active{background:var(--brass-light);}
 
   .manifesto{background:var(--bg-panel); border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline);}
   .manifesto-inner{max-width:760px; margin:0 auto;}
@@ -114,6 +131,10 @@
   </div>
 </section>
 
+<section class="featured-banner">
+  <div class="featured-grid" id="featuredGrid"></div>
+</section>
+
 <section class="manifesto" id="manifesto">
   <div class="wrap manifesto-inner">
     <div class="diamond"></div>
@@ -156,7 +177,10 @@
       <span class="eyebrow">Galeri</span>
       <h2>Atölyeden seçmeler</h2>
     </div>
-    <div class="gallery-grid" id="galleryGrid"></div>
+    <div class="carousel">
+      <div class="carousel-track" id="carouselTrack"></div>
+    </div>
+    <div class="carousel-dots" id="carouselDots"></div>
   </div>
 </section>
 
@@ -235,8 +259,37 @@ async function loadCategories(){
   note.textContent = 'Tam katalog için bir kategori seçin';
 }
 
+async function loadFeatured(){
+  const grid = document.getElementById('featuredGrid');
+  const { data } = await sb.from('aurichal_products')
+    .select('*, aurichal_categories(slug)').eq('is_featured', true).order('sort_order').limit(3);
+
+  let items = data || [];
+  if (items.length < 3) {
+    const { data: fallback } = await sb.from('aurichal_products')
+      .select('*, aurichal_categories(slug)').order('sort_order').limit(3);
+    items = fallback || [];
+  }
+  if (items.length === 0) { grid.style.display = 'none'; return; }
+
+  grid.innerHTML = items.map(p => {
+    const img = publicImageUrl(p.image_url);
+    const catSlug = p.aurichal_categories ? p.aurichal_categories.slug : 'default';
+    const media = img
+      ? '<img src="'+img+'" alt="'+escapeHtml(p.title)+'" loading="lazy">'
+      : '<div class="feat-icon">'+categoryIcon(catSlug)+'</div>';
+    return '<a class="feat-tile" href="urun.html?slug='+encodeURIComponent(p.slug)+'">'+media+
+      '<div class="feat-label">'+escapeHtml(p.title)+'</div></a>';
+  }).join('');
+}
+
+let carouselItems = [];
+let carouselIndex = 0;
+let carouselTimer = null;
+
 async function loadGallery(){
-  const grid = document.getElementById('galleryGrid');
+  const track = document.getElementById('carouselTrack');
+  const dotsWrap = document.getElementById('carouselDots');
   const { data: settingRow } = await sb.from('aurichal_site_content').select('value').eq('key','gallery_mode').maybeSingle();
   const mode = (settingRow && settingRow.value) || 'random';
 
@@ -244,7 +297,7 @@ async function loadGallery(){
     .select('*, aurichal_categories(slug)').order('sort_order');
 
   if (error || !data || data.length === 0) {
-    grid.innerHTML = '<div class="catalog-note" style="grid-column:1/-1;padding:40px 0;">Galeri için ürünler yakında eklenecek</div>';
+    track.innerHTML = '<div class="catalog-note" style="padding:80px 0;">Galeri için ürünler yakında eklenecek</div>';
     return;
   }
 
@@ -255,24 +308,55 @@ async function loadGallery(){
       [items[i], items[j]] = [items[j], items[i]];
     }
   }
-  items = items.slice(0, 8);
+  carouselItems = items.slice(0, 10);
 
-  grid.innerHTML = items.map(p => {
+  track.innerHTML = carouselItems.map((p, i) => {
     const img = publicImageUrl(p.image_url);
     const catSlug = p.aurichal_categories ? p.aurichal_categories.slug : 'default';
     const media = img
-      ? '<div class="img-wrap"><img src="'+img+'" alt="'+escapeHtml(p.title)+'" loading="lazy"></div>'
-      : '<div class="img-wrap"><div class="g-icon">'+categoryIcon(catSlug)+'</div></div>';
-    return '<a class="g-card" href="urun.html?slug='+encodeURIComponent(p.slug)+'">'+
+      ? '<div class="c-img"><img src="'+img+'" alt="'+escapeHtml(p.title)+'" loading="lazy"></div>'
+      : '<div class="c-img"><div class="c-icon">'+categoryIcon(catSlug)+'</div></div>';
+    let facts = '';
+    if (p.material) facts += '<div class="c-fact"><span class="k">Malzeme</span><span class="v">'+escapeHtml(p.material)+'</span></div>';
+    if (p.technique) facts += '<div class="c-fact"><span class="k">Teknik</span><span class="v">'+escapeHtml(p.technique)+'</span></div>';
+    if (Array.isArray(p.custom_fields)) {
+      p.custom_fields.slice(0,2).forEach(f => {
+        if (f && f.label) facts += '<div class="c-fact"><span class="k">'+escapeHtml(f.label)+'</span><span class="v">'+escapeHtml(f.value||'')+'</span></div>';
+      });
+    }
+    return '<div class="c-slide'+(i===0?' active':'')+'" data-i="'+i+'">'+
       media +
-      '<div class="g-body"><h4>'+escapeHtml(p.title)+'</h4>'+
-      (p.material ? '<span class="g-tag">'+escapeHtml(p.material)+'</span>' : '') +
-      '</div></a>';
+      '<div class="c-info"><h3>'+escapeHtml(p.title)+'</h3>'+
+      (p.description ? '<p>'+escapeHtml(p.description)+'</p>' : '') +
+      (facts ? '<div class="c-facts">'+facts+'</div>' : '') +
+      '<a href="urun.html?slug='+encodeURIComponent(p.slug)+'" class="btn btn-line" style="align-self:flex-start;">Ürünü İncele →</a>'+
+      '</div></div>';
   }).join('');
+
+  dotsWrap.innerHTML = carouselItems.map((_, i) => '<button class="c-dot'+(i===0?' active':'')+'" data-i="'+i+'"></button>').join('');
+  dotsWrap.querySelectorAll('.c-dot').forEach(dot => {
+    dot.addEventListener('click', () => { goToSlide(parseInt(dot.dataset.i, 10)); restartTimer(); });
+  });
+
+  restartTimer();
+}
+
+function goToSlide(i){
+  if (carouselItems.length === 0) return;
+  carouselIndex = (i + carouselItems.length) % carouselItems.length;
+  document.querySelectorAll('.c-slide').forEach(s => s.classList.toggle('active', parseInt(s.dataset.i,10) === carouselIndex));
+  document.querySelectorAll('.c-dot').forEach(d => d.classList.toggle('active', parseInt(d.dataset.i,10) === carouselIndex));
+}
+function restartTimer(){
+  if (carouselTimer) clearInterval(carouselTimer);
+  if (carouselItems.length > 1) {
+    carouselTimer = setInterval(() => goToSlide(carouselIndex + 1), 7000);
+  }
 }
 
 loadSiteContent();
 loadCategories();
+loadFeatured();
 loadGallery();
 </script>
 
