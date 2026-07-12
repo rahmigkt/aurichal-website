@@ -17,10 +17,24 @@
   .hero .sub{font-family:'Space Mono', monospace; font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:var(--brass-light); margin:0 0 30px;}
   .hero .tagline{font-size:20px; color:var(--ink-dim); max-width:480px; margin:0 0 40px;}
   .hero-ctas{display:flex; gap:16px; flex-wrap:wrap;}
-  .hero-visual{position:relative; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;}
-  .hero-visual svg{width:100%; height:100%; max-width:520px;}
+  .hero-visual{position:relative; display:flex; align-items:center; justify-content:center;}
+  .hero-visual img{width:100%; max-width:380px; height:auto; display:block;}
   .hero-bg-fade{position:absolute; inset:0; z-index:1; background:radial-gradient(circle at 78% 46%, rgba(176,138,70,0.10), transparent 60%);}
-  @media (max-width:900px){ .hero-grid{grid-template-columns:1fr;} .hero-visual{order:-1; max-width:320px; margin:0 auto 20px;} }
+  @media (max-width:900px){ .hero-grid{grid-template-columns:1fr;} .hero-visual{order:-1; max-width:220px; margin:0 auto 20px;} }
+
+  .gallery-section{background:var(--bg-panel); border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline);}
+  .gallery-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; background:var(--hairline); border:1px solid var(--hairline);}
+  .g-card{background:var(--bg); text-decoration:none; color:var(--ink); display:block;}
+  .g-card:hover{background:var(--bg-panel-2);}
+  .g-card .img-wrap{aspect-ratio:1/1; background:var(--bg-panel); overflow:hidden;}
+  .g-card .img-wrap img{width:100%; height:100%; object-fit:cover; display:block;}
+  .g-icon{width:100%; height:100%; display:flex; align-items:center; justify-content:center;}
+  .g-icon svg{width:32%; height:32%; stroke:var(--brass); fill:none; stroke-width:1.3;}
+  .g-body{padding:16px 18px 20px;}
+  .g-card h4{font-family:'Space Grotesk', sans-serif; font-size:15px; font-weight:600; margin:0 0 4px;}
+  .g-card .g-tag{font-family:'Space Mono', monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--label);}
+  @media (max-width:860px){ .gallery-grid{grid-template-columns:1fr 1fr;} }
+  @media (max-width:520px){ .gallery-grid{grid-template-columns:1fr;} }
 
   .manifesto{background:var(--bg-panel); border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline);}
   .manifesto-inner{max-width:760px; margin:0 auto;}
@@ -73,7 +87,7 @@
 
 <header>
   <div class="navbar">
-    <a href="index.html" class="wordmark"><img src="assets/logo/mark-copper.png" alt="Aurichal"> AURICHAL</a>
+    <a href="index.html" class="wordmark"><img src="assets/logo/mark-copper.png" alt="Aurichal" style="height:44px;"> AURICHAL</a>
     <div class="navlinks">
       <a href="#koleksiyon">Koleksiyon</a>
       <a href="#manifesto">Manifesto</a>
@@ -95,13 +109,7 @@
       </div>
     </div>
     <div class="hero-visual">
-      <svg viewBox="0 0 400 400" id="heroSvg">
-        <g id="ringOuter" fill="none" stroke="var(--brass)" stroke-width="1" opacity="0.55"><circle cx="200" cy="200" r="170"/></g>
-        <g id="ringRadials" stroke="var(--brass)" stroke-width="1" opacity="0.35"></g>
-        <g id="ringMid" fill="none" stroke="var(--brass-light)" stroke-width="1" opacity="0.7"><circle cx="200" cy="200" r="118"/></g>
-        <polygon id="hexCore" points="200,132 259,166 259,234 200,268 141,234 141,166" fill="none" stroke="var(--copper)" stroke-width="1.4"/>
-        <circle cx="200" cy="200" r="5" fill="var(--brass-light)"/>
-      </svg>
+      <img src="assets/logo/mark-copper.png" alt="Aurichal işareti">
     </div>
   </div>
 </section>
@@ -142,6 +150,16 @@
   </div>
 </section>
 
+<section class="gallery-section" id="galeri">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Galeri</span>
+      <h2>Atölyeden seçmeler</h2>
+    </div>
+    <div class="gallery-grid" id="galleryGrid"></div>
+  </div>
+</section>
+
 <section class="contact" id="iletisim">
   <div class="wrap contact-inner">
     <div>
@@ -165,38 +183,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/shared.js"></script>
 <script>
-(function(){
-  // hero geometrik animasyon
-  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var radials = document.getElementById('ringRadials');
-  var n = 16, cx=200, cy=200, r1=170, r2=118;
-  for(var i=0;i<n;i++){
-    var a = (i/n)*Math.PI*2;
-    var x1 = cx + r2*Math.cos(a), y1 = cy + r2*Math.sin(a);
-    var x2 = cx + r1*Math.cos(a), y2 = cy + r1*Math.sin(a);
-    var line = document.createElementNS('http://www.w3.org/2000/svg','line');
-    line.setAttribute('x1',x1); line.setAttribute('y1',y1);
-    line.setAttribute('x2',x2); line.setAttribute('y2',y2);
-    radials.appendChild(line);
-  }
-  if(!reduced){
-    var outer = document.getElementById('ringOuter');
-    var mid = document.getElementById('ringMid');
-    var hex = document.getElementById('hexCore');
-    var a1=0, a2=0;
-    function frame(ts){
-      if(!frame.last) frame.last = ts;
-      var dt = (ts - frame.last)/1000; frame.last = ts;
-      a1 += dt*4; a2 -= dt*6;
-      outer.setAttribute('transform','rotate('+a1+' 200 200)');
-      radials.setAttribute('transform','rotate('+a1+' 200 200)');
-      hex.setAttribute('transform','rotate('+a2+' 200 200)');
-      requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-  }
-})();
-
 // ---- Supabase'ten içerik yükleme ----
 async function loadSiteContent(){
   const { data, error } = await sb.from('aurichal_site_content').select('key,value');
@@ -249,8 +235,45 @@ async function loadCategories(){
   note.textContent = 'Tam katalog için bir kategori seçin';
 }
 
+async function loadGallery(){
+  const grid = document.getElementById('galleryGrid');
+  const { data: settingRow } = await sb.from('aurichal_site_content').select('value').eq('key','gallery_mode').maybeSingle();
+  const mode = (settingRow && settingRow.value) || 'random';
+
+  const { data, error } = await sb.from('aurichal_products')
+    .select('*, aurichal_categories(slug)').order('sort_order');
+
+  if (error || !data || data.length === 0) {
+    grid.innerHTML = '<div class="catalog-note" style="grid-column:1/-1;padding:40px 0;">Galeri için ürünler yakında eklenecek</div>';
+    return;
+  }
+
+  let items = data.slice();
+  if (mode === 'random') {
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+  }
+  items = items.slice(0, 8);
+
+  grid.innerHTML = items.map(p => {
+    const img = publicImageUrl(p.image_url);
+    const catSlug = p.aurichal_categories ? p.aurichal_categories.slug : 'default';
+    const media = img
+      ? '<div class="img-wrap"><img src="'+img+'" alt="'+escapeHtml(p.title)+'" loading="lazy"></div>'
+      : '<div class="img-wrap"><div class="g-icon">'+categoryIcon(catSlug)+'</div></div>';
+    return '<a class="g-card" href="urun.html?slug='+encodeURIComponent(p.slug)+'">'+
+      media +
+      '<div class="g-body"><h4>'+escapeHtml(p.title)+'</h4>'+
+      (p.material ? '<span class="g-tag">'+escapeHtml(p.material)+'</span>' : '') +
+      '</div></a>';
+  }).join('');
+}
+
 loadSiteContent();
 loadCategories();
+loadGallery();
 </script>
 
 </body>
