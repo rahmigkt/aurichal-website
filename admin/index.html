@@ -127,6 +127,10 @@
         <div class="field"><label>Malzeme</label><input type="text" id="prodMaterial" placeholder="örn. Pirinç (Ham)"></div>
       </div>
       <div class="field"><label>Teknik</label><input type="text" id="prodTechnique" placeholder="örn. Dövme, Kalemkâri"></div>
+      <div class="field" style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" id="prodFeatured" style="width:16px; height:16px;">
+        <label style="margin:0;">Ana sayfada "Öne Çıkanlar" büyük görsel alanında göster</label>
+      </div>
       <div class="field"><label>Açıklama</label><textarea id="prodDesc" placeholder="Ürün açıklaması"></textarea></div>
       <div class="field"><label>Ürün Görseli</label><input type="file" id="prodImage" accept="image/*"></div>
       <div class="field">
@@ -369,6 +373,7 @@ function editProduct(p){
   document.getElementById('prodCategory').value = p.category_id || '';
   document.getElementById('prodMaterial').value = p.material || '';
   document.getElementById('prodTechnique').value = p.technique || '';
+  document.getElementById('prodFeatured').checked = !!p.is_featured;
   document.getElementById('prodDesc').value = p.description || '';
   clearCustomFieldsForm();
   (Array.isArray(p.custom_fields) ? p.custom_fields : []).forEach(f => addCustomFieldRow(f.label, f.value));
@@ -379,6 +384,7 @@ function resetProdForm(){
   editingProdId = null;
   document.getElementById('prodFormTitle').textContent = 'Yeni Ürün Ekle';
   ['prodId','prodTitle','prodSlug','prodMaterial','prodTechnique','prodDesc'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('prodFeatured').checked = false;
   document.getElementById('prodImage').value = '';
   clearCustomFieldsForm();
   document.getElementById('cancelProdBtn').style.display = 'none';
@@ -413,6 +419,7 @@ document.getElementById('saveProdBtn').onclick = async () => {
     material: document.getElementById('prodMaterial').value,
     technique: document.getElementById('prodTechnique').value,
     description: document.getElementById('prodDesc').value,
+    is_featured: document.getElementById('prodFeatured').checked,
     custom_fields: getCustomFieldsFromForm()
   };
   if (image_url) payload.image_url = image_url;
