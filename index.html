@@ -1,20 +1,257 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" dir="ltr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aurichal — Yapım Aşamasında</title>
+<title>AURICHAL — Handcrafted Brass &amp; Copper</title>
+<meta name="description" content="Aurichal — pirinç ve bakırı geometrik formlarla buluşturan çağdaş zanaat atölyesi. Avize, kapı kolu, aydınlatma ve mimari detaylar.">
+<link rel="icon" href="assets/logo/mark-copper.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/brand.css">
 <style>
-  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-       background:#0d0d0d;color:#eee;font-family:Georgia,'Times New Roman',serif;text-align:center;}
-  h1{font-weight:400;letter-spacing:0.08em;font-size:2.2rem;margin-bottom:0.5rem;}
-  p{opacity:0.6;font-family:monospace;letter-spacing:0.05em;}
+  .hero{position:relative; min-height:100vh; display:flex; align-items:center; overflow:hidden; padding-top:90px;}
+  .hero-grid{position:relative; z-index:2; display:grid; grid-template-columns:1.1fr 0.9fr; align-items:center; gap:40px; width:100%;}
+  .hero h1{font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:clamp(52px, 8vw, 108px); line-height:0.95; letter-spacing:-0.01em; margin:22px 0 6px;}
+  .hero .sub{font-family:'Space Mono', monospace; font-size:14px; letter-spacing:0.14em; text-transform:uppercase; color:var(--brass-light); margin:0 0 30px;}
+  .hero .tagline{font-size:20px; color:var(--ink-dim); max-width:480px; margin:0 0 40px;}
+  .hero-ctas{display:flex; gap:16px; flex-wrap:wrap;}
+  .hero-visual{position:relative; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;}
+  .hero-visual svg{width:100%; height:100%; max-width:520px;}
+  .hero-bg-fade{position:absolute; inset:0; z-index:1; background:radial-gradient(circle at 78% 46%, rgba(176,138,70,0.10), transparent 60%);}
+  @media (max-width:900px){ .hero-grid{grid-template-columns:1fr;} .hero-visual{order:-1; max-width:320px; margin:0 auto 20px;} }
+
+  .manifesto{background:var(--bg-panel); border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline);}
+  .manifesto-inner{max-width:760px; margin:0 auto;}
+  .manifesto p{font-size:19px; line-height:1.85; color:var(--ink-dim); margin:0 0 28px;}
+  .manifesto p:first-of-type{color:var(--ink); font-size:22px;}
+  .manifesto .closing{font-family:'Space Grotesk', sans-serif; font-size:26px; color:var(--ink); font-weight:500; margin-top:40px; line-height:1.4;}
+  .diamond{width:9px; height:9px; background:var(--brass); transform:rotate(45deg); margin:0 0 30px;}
+
+  .specs{display:grid; grid-template-columns:repeat(4, 1fr); border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline);}
+  .spec-item{padding:36px 32px; border-left:1px solid var(--hairline);}
+  .spec-item:first-child{border-left:none;}
+  .spec-label{font-family:'Space Mono', monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--label); margin-bottom:12px; display:block;}
+  .spec-value{font-family:'Space Grotesk', sans-serif; font-size:19px; font-weight:500; color:var(--ink);}
+  @media (max-width:860px){ .specs{grid-template-columns:1fr 1fr;} .spec-item:nth-child(3){border-left:none;} }
+  @media (max-width:520px){ .specs{grid-template-columns:1fr;} .spec-item{border-left:none !important; border-top:1px solid var(--hairline);} .spec-item:first-child{border-top:none;} }
+
+  .collection-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; background:var(--hairline); border:1px solid var(--hairline);}
+  .col-card{background:var(--bg); text-align:left; display:flex; flex-direction:column; transition:background .25s; text-decoration:none; color:var(--ink);}
+  .col-card:hover{background:var(--bg-panel-2);}
+  .col-card .img-wrap{aspect-ratio:4/3; overflow:hidden; background:var(--bg-panel);}
+  .col-card .img-wrap img{width:100%; height:100%; object-fit:cover; display:block;}
+  .col-icon{width:100%; height:100%; display:flex; align-items:center; justify-content:center;}
+  .col-icon svg{width:40%; height:40%; stroke:var(--brass); fill:none; stroke-width:1.3;}
+  .col-card:hover .col-icon svg{stroke:var(--brass-light);}
+  .col-body{padding:24px 26px 28px; display:flex; flex-direction:column; gap:8px; flex:1;}
+  .col-card h3{font-family:'Space Grotesk', sans-serif; font-size:19px; font-weight:600; margin:0;}
+  .col-card p{font-size:14px; color:var(--ink-dim); margin:0; line-height:1.5;}
+  .col-card .tag{font-family:'Space Mono', monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--label); margin-top:auto; padding-top:10px;}
+  @media (max-width:860px){ .collection-grid{grid-template-columns:1fr 1fr;} }
+  @media (max-width:520px){ .collection-grid{grid-template-columns:1fr;} }
+  .catalog-note{text-align:center; margin-top:36px; font-family:'Space Mono', monospace; font-size:12px; letter-spacing:0.08em; color:var(--label); text-transform:uppercase;}
+
+  .contact{background:var(--bg-panel); border-top:1px solid var(--hairline);}
+  .contact-inner{display:grid; grid-template-columns:1.1fr 0.9fr; gap:60px; align-items:start;}
+  .contact h2{font-family:'Space Grotesk', sans-serif; font-size:clamp(30px,4vw,42px); font-weight:600; margin:16px 0 20px; letter-spacing:-0.01em;}
+  .contact p.lead{font-size:17px; color:var(--ink-dim); max-width:440px;}
+  .contact-locations{margin-top:40px; display:flex; flex-direction:column; gap:18px;}
+  .loc-item{display:flex; gap:16px; align-items:baseline;}
+  .loc-label{font-family:'Space Mono', monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--brass-light); min-width:90px;}
+  .loc-value{color:var(--ink-dim); font-size:15px;}
+  .contact-card{background:var(--bg); border:1px solid var(--hairline); padding:40px;}
+  .contact-card .row{display:flex; flex-direction:column; gap:6px; margin-bottom:24px;}
+  .contact-card label{font-family:'Space Mono', monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--label);}
+  .contact-card a.big-link{font-family:'Space Grotesk', sans-serif; font-size:22px; font-weight:600; color:var(--ink); text-decoration:none; border-bottom:1px solid var(--hairline-strong); padding-bottom:4px; display:inline-block; transition:color .2s, border-color .2s;}
+  .contact-card a.big-link:hover{color:var(--brass-light); border-color:var(--brass-light);}
+  @media (max-width:860px){ .contact-inner{grid-template-columns:1fr;} }
 </style>
 </head>
 <body>
-  <div>
-    <h1>AURICHAL</h1>
-    <p>Site yapım aşamasında — deploy testi</p>
+
+<header>
+  <div class="navbar">
+    <a href="index.html" class="wordmark"><img src="assets/logo/mark-copper.png" alt="Aurichal"> AURICHAL</a>
+    <div class="navlinks">
+      <a href="#koleksiyon">Koleksiyon</a>
+      <a href="#manifesto">Manifesto</a>
+      <a href="#iletisim" class="cta-link">Teklif Al</a>
+    </div>
   </div>
+</header>
+
+<section class="hero">
+  <div class="hero-bg-fade"></div>
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">Handcrafted Brass &amp; Copper</span>
+      <h1>AURICHAL</h1>
+      <p class="tagline" id="heroTagline">Maddenin <strong>Geometrisi</strong>, metalin <strong>saf hali.</strong></p>
+      <div class="hero-ctas">
+        <a href="#koleksiyon" class="btn btn-solid">Koleksiyonu Gör →</a>
+        <a href="#manifesto" class="btn btn-line">Manifesto</a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <svg viewBox="0 0 400 400" id="heroSvg">
+        <g id="ringOuter" fill="none" stroke="var(--brass)" stroke-width="1" opacity="0.55"><circle cx="200" cy="200" r="170"/></g>
+        <g id="ringRadials" stroke="var(--brass)" stroke-width="1" opacity="0.35"></g>
+        <g id="ringMid" fill="none" stroke="var(--brass-light)" stroke-width="1" opacity="0.7"><circle cx="200" cy="200" r="118"/></g>
+        <polygon id="hexCore" points="200,132 259,166 259,234 200,268 141,234 141,166" fill="none" stroke="var(--copper)" stroke-width="1.4"/>
+        <circle cx="200" cy="200" r="5" fill="var(--brass-light)"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section class="manifesto" id="manifesto">
+  <div class="wrap manifesto-inner">
+    <div class="diamond"></div>
+    <span class="eyebrow">Manifesto</span>
+    <div id="manifestoBody" style="margin-top:24px;">
+      <p class="skeleton" style="height:80px;"></p>
+      <p class="skeleton" style="height:80px;"></p>
+    </div>
+  </div>
+</section>
+
+<section class="specs-section">
+  <div class="specs">
+    <div class="spec-item"><span class="spec-label">Alaşım</span><span class="spec-value">Pirinç (Cu-Zn) · Bakır (Cu)</span></div>
+    <div class="spec-item"><span class="spec-label">Yüzey</span><span class="spec-value">Elde İşlenmiş, Ham, Cilasız</span></div>
+    <div class="spec-item"><span class="spec-label">Teknik</span><span class="spec-value">Kalemkâri · Dövme · Isıl İşlem</span></div>
+    <div class="spec-item"><span class="spec-label">Form</span><span class="spec-value">Geleneksel Motif, Modern Kompozisyon</span></div>
+  </div>
+</section>
+
+<section id="koleksiyon">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Koleksiyon</span>
+      <h2>Mekâna taşınan geometrik formlar</h2>
+    </div>
+    <div class="collection-grid" id="categoryGrid">
+      <div class="col-card"><div class="img-wrap skeleton"></div><div class="col-body"><div class="skeleton" style="height:20px;width:60%"></div></div></div>
+      <div class="col-card"><div class="img-wrap skeleton"></div><div class="col-body"><div class="skeleton" style="height:20px;width:60%"></div></div></div>
+      <div class="col-card"><div class="img-wrap skeleton"></div><div class="col-body"><div class="skeleton" style="height:20px;width:60%"></div></div></div>
+      <div class="col-card"><div class="img-wrap skeleton"></div><div class="col-body"><div class="skeleton" style="height:20px;width:60%"></div></div></div>
+    </div>
+    <p class="catalog-note" id="catalogNote">Tam katalog yükleniyor…</p>
+  </div>
+</section>
+
+<section class="contact" id="iletisim">
+  <div class="wrap contact-inner">
+    <div>
+      <span class="eyebrow">Teklif &amp; İletişim</span>
+      <h2>Her parça, mekâna özel bir projedir</h2>
+      <p class="lead">Aurichal ürünleri kişiye ve mekâna özel olarak üretilir. Ölçü, alaşım tercihi ve yüzey işlemi projeye göre şekillenir.</p>
+      <div class="contact-locations" id="contactLocations"></div>
+    </div>
+    <div class="contact-card" id="contactCard"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <span class="foot-word">AURICHAL</span>
+    <span class="foot-meta">Handcrafted Brass &amp; Copper</span>
+    <span class="foot-meta">© 2026 Aurichal</span>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/shared.js"></script>
+<script>
+(function(){
+  // hero geometrik animasyon
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var radials = document.getElementById('ringRadials');
+  var n = 16, cx=200, cy=200, r1=170, r2=118;
+  for(var i=0;i<n;i++){
+    var a = (i/n)*Math.PI*2;
+    var x1 = cx + r2*Math.cos(a), y1 = cy + r2*Math.sin(a);
+    var x2 = cx + r1*Math.cos(a), y2 = cy + r1*Math.sin(a);
+    var line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',x1); line.setAttribute('y1',y1);
+    line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+    radials.appendChild(line);
+  }
+  if(!reduced){
+    var outer = document.getElementById('ringOuter');
+    var mid = document.getElementById('ringMid');
+    var hex = document.getElementById('hexCore');
+    var a1=0, a2=0;
+    function frame(ts){
+      if(!frame.last) frame.last = ts;
+      var dt = (ts - frame.last)/1000; frame.last = ts;
+      a1 += dt*4; a2 -= dt*6;
+      outer.setAttribute('transform','rotate('+a1+' 200 200)');
+      radials.setAttribute('transform','rotate('+a1+' 200 200)');
+      hex.setAttribute('transform','rotate('+a2+' 200 200)');
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+})();
+
+// ---- Supabase'ten içerik yükleme ----
+async function loadSiteContent(){
+  const { data, error } = await sb.from('aurichal_site_content').select('key,value');
+  if (error || !data) return;
+  const map = {};
+  data.forEach(r => map[r.key] = r.value);
+
+  if (map.hero_tagline) document.getElementById('heroTagline').innerHTML = escapeHtml(map.hero_tagline);
+
+  const mBody = document.getElementById('manifestoBody');
+  mBody.innerHTML =
+    (map.manifesto_p1 ? '<p>'+escapeHtml(map.manifesto_p1)+'</p>' : '') +
+    (map.manifesto_p2 ? '<p>'+escapeHtml(map.manifesto_p2)+'</p>' : '') +
+    (map.manifesto_closing ? '<p class="closing">'+escapeHtml(map.manifesto_closing)+'</p>' : '');
+
+  const locs = document.getElementById('contactLocations');
+  locs.innerHTML =
+    (map.contact_workshop ? '<div class="loc-item"><span class="loc-label">Atölye</span><span class="loc-value">'+escapeHtml(map.contact_workshop)+'</span></div>' : '') +
+    (map.contact_office ? '<div class="loc-item"><span class="loc-label">Ofis</span><span class="loc-value">'+escapeHtml(map.contact_office)+'</span></div>' : '') +
+    (map.contact_phone ? '<div class="loc-item"><span class="loc-label">Telefon</span><span class="loc-value">'+escapeHtml(map.contact_phone)+'</span></div>' : '');
+
+  const phoneDigits = (map.contact_phone||'').replace(/\D/g,'');
+  const card = document.getElementById('contactCard');
+  card.innerHTML =
+    (map.contact_phone ? '<div class="row"><label>Telefon</label><a class="big-link" href="tel:+90'+phoneDigits.slice(-10)+'">'+escapeHtml(map.contact_phone)+'</a></div>' : '') +
+    (map.contact_email ? '<div class="row"><label>E-posta</label><a class="big-link" href="mailto:'+escapeHtml(map.contact_email)+'">'+escapeHtml(map.contact_email)+'</a></div>' : '') +
+    (phoneDigits ? '<div class="row" style="margin-bottom:0;"><label>WhatsApp</label><a class="big-link" href="https://wa.me/90'+phoneDigits.slice(-10)+'" target="_blank" rel="noopener">Mesaj Gönder →</a></div>' : '');
+}
+
+async function loadCategories(){
+  const { data, error } = await sb.from('aurichal_categories').select('*').order('sort_order');
+  const grid = document.getElementById('categoryGrid');
+  const note = document.getElementById('catalogNote');
+  if (error || !data || data.length === 0) {
+    grid.innerHTML = '';
+    note.textContent = 'Koleksiyon yakında yayında';
+    return;
+  }
+  grid.innerHTML = data.map(cat => {
+    const img = publicImageUrl(cat.sample_image_url);
+    const media = img
+      ? '<div class="img-wrap"><img src="'+img+'" alt="'+escapeHtml(cat.name)+'" loading="lazy"></div>'
+      : '<div class="img-wrap"><div class="col-icon">'+categoryIcon(cat.slug)+'</div></div>';
+    return '<a class="col-card" href="kategori.html?slug='+encodeURIComponent(cat.slug)+'">'+
+      media +
+      '<div class="col-body"><h3>'+escapeHtml(cat.name)+'</h3>'+
+      (cat.description ? '<p>'+escapeHtml(cat.description)+'</p>' : '') +
+      '<span class="tag">Koleksiyonu Gör →</span></div></a>';
+  }).join('');
+  note.textContent = 'Tam katalog için bir kategori seçin';
+}
+
+loadSiteContent();
+loadCategories();
+</script>
+
 </body>
 </html>
