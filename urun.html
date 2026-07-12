@@ -87,6 +87,11 @@ async function init(){
   let specsHtml = '';
   if (p.material) specsHtml += '<div class="p-spec-row"><span class="k">Malzeme</span><span class="v">'+escapeHtml(p.material)+'</span></div>';
   if (p.technique) specsHtml += '<div class="p-spec-row"><span class="k">Teknik</span><span class="v">'+escapeHtml(p.technique)+'</span></div>';
+  if (Array.isArray(p.custom_fields)) {
+    p.custom_fields.forEach(f => {
+      if (f && f.label) specsHtml += '<div class="p-spec-row"><span class="k">'+escapeHtml(f.label)+'</span><span class="v">'+escapeHtml(f.value||'')+'</span></div>';
+    });
+  }
 
   layout.innerHTML =
     '<div class="product-image">'+media+'</div>'+
