@@ -12,17 +12,17 @@ class MukantaraSalon extends Immersion {
       viewHeight: 1.75,
       skyboxSize: 300,
       // MUKANTARA marka paleti: --wall koyu yeşil-siyah tonu
-      skyColor: new BABYLON.Color3(0.05, 0.07, 0.06),
+      skyColor: new BABYLON.Color3(0.03, 0.05, 0.075),
       fogDensity: 0.006,
-      fogColor: new BABYLON.Color3(0.05, 0.07, 0.06),
+      fogColor: new BABYLON.Color3(0.03, 0.05, 0.075),
       groundSize: 40,
     };
     super("mukantaraSalon", "dark", engine, config);
 
     // -- Zemin: PCB/devre deseni doku (koyu zemin + parlayan devre izleri) --
-    const floorTex = this.createCircuitTexture("floorCircuit", { size: 1024, density: 70, lineWidth: 2.2 });
+    const floorTex = this.createCircuitTexture("floorCircuit", { size: 1024, density: 70, lineWidth: 2.2, bg: "#050b14" });
     floorTex.uScale = 7; floorTex.vScale = 7;
-    this.ground.material.diffuseColor = new BABYLON.Color3(0.02, 0.03, 0.035);
+    this.ground.material.diffuseColor = new BABYLON.Color3(0.03, 0.05, 0.08);
     this.ground.material.emissiveTexture = floorTex;
     this.ground.material.diffuseTexture = floorTex;
     this.ground.material.emissiveColor = new BABYLON.Color3(0.55, 0.55, 0.55);
@@ -68,9 +68,9 @@ class MukantaraSalon extends Immersion {
     // Çok-odalı galerinin ilk parçası. Yeni salonlar eklendikçe bu fonksiyonlarla
     // (createCorridor / createRoomWithDoorway) genişletilecek — tek dosyadan yönetilebilir.
     this.wallMat = new BABYLON.StandardMaterial("wallMat", this);
-    this.wallMat.diffuseColor = new BABYLON.Color3(0.02, 0.03, 0.03);
+    this.wallMat.diffuseColor = new BABYLON.Color3(0.03, 0.05, 0.08);
     this.wallMat.specularColor = new BABYLON.Color3(0, 0, 0);
-    const wallTex = this.createCircuitTexture("wallCircuit", { size: 1024, density: 34, lineWidth: 2 });
+    const wallTex = this.createCircuitTexture("wallCircuit", { size: 1024, density: 34, lineWidth: 2, bg: "#050b14" });
     wallTex.uScale = 3; wallTex.vScale = 1.4;
     this.wallMat.emissiveTexture = wallTex;
     this.wallMat.diffuseTexture = wallTex;
