@@ -73,8 +73,71 @@ class MukantaraSalon extends Immersion {
     // (gelecekteki 2. salona geçiş için — henüz o taraf boş/karanlık)
     this.createRoomWithDoorway({
       centerX: 0, frontZ: 6, backZ: -6, width: 14,
-      doorwayWidth: 3, doorwayHeight: 2.6,
+      doorwayX: 5, doorwayWidth: 2.4, doorwayHeight: 2.6,
     });
+
+    // -- Duvar ekranları: her kaidenin arkasında, tıklanınca ilgili dijital aracı
+    // yeni sekmede açan panel. Henüz aracı olmayanlar (ör. Halkalı Küre) sadece
+    // "Yakında" yazan, tıklanamaz bir panel olarak duruyor.
+    this.createWallScreen(-3, -5.85, "Halkalı Küre", "Yakında", null);
+    this.createWallScreen(0, -5.85, "Zerkâliyye", "İncele →", "https://mukantara.com/deneyimler/tusi-cifti/");
+    this.createWallScreen(3, -5.85, "Zerkâliyye", "İncele →", "https://mukantara.com/deneyimler/tusi-cifti/");
+  }
+
+  // Duvara gömülü, tıklanınca dijital aracı yeni sekmede açan ekran paneli.
+  // url == null ise ekran sadece bilgi amaçlı durur, tıklanamaz.
+  createWallScreen(x, z, title, actionLabel, url) {
+    const w = 1.6, h = 1.0;
+    const dt = new BABYLON.DynamicTexture("screenTex_" + x, { width: 512, height: 320 }, this);
+    const ctx = dt.getContext();
+    ctx.fillStyle = "#0a0d0a";
+    ctx.fillRect(0, 0, 512, 320);
+    ctx.strokeStyle = url ? "#a97b3c" : "#3a3a3a";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(6, 6, 500, 308);
+    ctx.fillStyle = url ? "#e8d9b8" : "#777777";
+    ctx.font = "bold 40px Georgia";
+    ctx.textAlign = "center";
+    ctx.fillText(title, 256, 150);
+    ctx.font = "28px Georgia";
+    ctx.fillStyle = url ? "#a97b3c" : "#555555";
+    ctx.fillText(actionLabel, 256, 210);
+    dt.update();
+
+    const mat = new BABYLON.StandardMaterial("screenMat_" + x, this);
+    mat.diffuseTexture = dt;
+    mat.emissiveTexture = dt;
+    mat.emissiveColor = new BABYLON.Color3(url ? 0.5 : 0.15, url ? 0.5 : 0.15, url ? 0.5 : 0.15);
+    mat.specularColor = new BABYLON.Color3(0, 0, 0);
+    mat.backFaceCulling = false;
+
+    const screen = BABYLON.MeshBuilder.CreatePlane("wallScreen_" + x, {
+      width: w, height: h, sideOrientation: BABYLON.Mesh.DOUBLESIDE,
+    }, this);
+    screen.position = new BABYLON.Vector3(x, 1.9, z);
+    screen.material = mat;
+    screen.isPickable = !!url;
+
+    if (url) {
+      screen.actionManager = new BABYLON.ActionManager(this);
+      screen.actionManager.hoverCursor = "pointer";
+      screen.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
+          screen.scaling = new BABYLON.Vector3(1.06, 1.06, 1.06);
+        }),
+      );
+      screen.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
+          screen.scaling = new BABYLON.Vector3(1, 1, 1);
+        }),
+      );
+      screen.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
+          this.openLink(url, title, true); // true = yeni sekmede aç, salon açık kalır
+        }),
+      );
+    }
+    return screen;
   }
 
   // İki duvar arasında dar bir geçiş koridoru oluşturur
@@ -90,8 +153,8 @@ class MukantaraSalon extends Immersion {
     [left, right].forEach(w => { w.checkCollisions = true; w.isPickable = false; });
   }
 
-  // Sol/sağ duvarlı, arka duvarında ortada kapı boşluğu olan bir salon oluşturur
-  createRoomWithDoorway({ centerX, frontZ, backZ, width, doorwayWidth, doorwayHeight }) {
+  // Sol/sağ duvarlı, arka duvarında (merkeze göre kaydırılabilir) kapı boşluğu olan bir salon oluşturur
+  createRoomWithDoorway({ centerX, frontZ, backZ, width, doorwayX, doorwayWidth, doorwayHeight }) {
     const depth = frontZ - backZ;
     const midZ = (frontZ + backZ) / 2;
     const left = BABYLON.MeshBuilder.CreateBox("roomLeft", { width: 0.2, height: this.wallH, depth }, this);
@@ -101,17 +164,20 @@ class MukantaraSalon extends Immersion {
     right.position = new BABYLON.Vector3(centerX + width / 2, this.wallH / 2, midZ);
     right.material = this.wallMat;
 
-    // arka duvar: ortada kapı boşluğu bırakan iki parça + kapı üstü lento
-    const sidePieceW = (width - doorwayWidth) / 2;
-    const backL = BABYLON.MeshBuilder.CreateBox("roomBackL", { width: sidePieceW, height: this.wallH, depth: 0.2 }, this);
-    backL.position = new BABYLON.Vector3(centerX - doorwayWidth / 2 - sidePieceW / 2, this.wallH / 2, backZ);
+    // arka duvar: doorwayX'te kapı boşluğu bırakan iki parça + kapı üstü lento
+    const wallMinX = centerX - width / 2, wallMaxX = centerX + width / 2;
+    const gapMinX = doorwayX - doorwayWidth / 2, gapMaxX = doorwayX + doorwayWidth / 2;
+    const leftPieceW = gapMinX - wallMinX;
+    const rightPieceW = wallMaxX - gapMaxX;
+    const backL = BABYLON.MeshBuilder.CreateBox("roomBackL", { width: leftPieceW, height: this.wallH, depth: 0.2 }, this);
+    backL.position = new BABYLON.Vector3(wallMinX + leftPieceW / 2, this.wallH / 2, backZ);
     backL.material = this.wallMat;
-    const backR = BABYLON.MeshBuilder.CreateBox("roomBackR", { width: sidePieceW, height: this.wallH, depth: 0.2 }, this);
-    backR.position = new BABYLON.Vector3(centerX + doorwayWidth / 2 + sidePieceW / 2, this.wallH / 2, backZ);
+    const backR = BABYLON.MeshBuilder.CreateBox("roomBackR", { width: rightPieceW, height: this.wallH, depth: 0.2 }, this);
+    backR.position = new BABYLON.Vector3(gapMaxX + rightPieceW / 2, this.wallH / 2, backZ);
     backR.material = this.wallMat;
     const lintelH = this.wallH - doorwayHeight;
     const lintel = BABYLON.MeshBuilder.CreateBox("roomLintel", { width: doorwayWidth, height: lintelH, depth: 0.2 }, this);
-    lintel.position = new BABYLON.Vector3(centerX, doorwayHeight + lintelH / 2, backZ);
+    lintel.position = new BABYLON.Vector3(doorwayX, doorwayHeight + lintelH / 2, backZ);
     lintel.material = this.wallMat;
 
     [left, right, backL, backR, lintel].forEach(w => { w.checkCollisions = true; w.isPickable = false; });
