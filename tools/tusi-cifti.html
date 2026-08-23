@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tusi Çifti — Nasīr al-Dīn al-Ṭūsī</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════════════
+   RESET & BASE
+════════════════════════════════════════════════ */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+    width:100%; height:100vh; height:100dvh; overflow:hidden;
+    background:#05060a;
+    color:#c8cdd8;
+    font-family:'Cormorant Garamond', Georgia, serif;
+    -webkit-font-smoothing:antialiased;
+}
+
+/* Respect users who don't want continuous motion */
+@media (prefers-reduced-motion: reduce) {
+    .scene-card { transition-duration: 0.01ms !important; }
+}
+
+/* ════════════════════════════════════════════════
+   LAYOUT — two columns
+════════════════════════════════════════════════ */
+#stage {
+    position:fixed; inset:0;
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+}
+
+/* LEFT — canvas */
+#canvasWrap {
+    position:relative;
+    overflow:hidden;
+    border-right: 1px solid rgba(255,255,255,0.04);
+}
+#mainCanvas { display:block; width:100%; height:100%; }
+
+/* Vignette on canvas side */
+#canvasWrap::after {
+    content:'';
+    position:absolute; inset:0;
+    background:
+        radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(5,6,10,0.5) 100%),
+        linear-gradient(to right, transparent 70%, rgba(5,6,10,0.7) 100%);
+    pointer-events:none;
+}
+
+/* RIGHT — narrative */
+#narrativeWrap {
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding: 52px 60px 44px 64px;
+    overflow:hidden;
+}
+
+/* subtle grid texture on narrative side */
+#narrativeWrap::before {
+    content:'';
+    position:absolute; inset:0;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events:none;
+}
+
+/* ════════════════════════════════════════════════
+   TOP META
+════════════════════════════════════════════════ */
+#topMeta {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    position:relative;
+    z-index:2;
+    flex-wrap:wrap;
+    row-gap:10px;
+}
+
+.meta-label {
+    font-family:'Courier Prime', monospace;
+    font-size:clamp(0.55rem, 0.85vw, 0.72rem);
+    letter-spacing:0.4em;
+    text-transform:uppercase;
+    color:rgba(200,205,216,0.48);
+    line-height:2;
+}
+
+.meta-label strong {
+    display:block;
+    color:rgba(200,205,216,0.72);
+    font-weight:400;
+}
+
+.progress-track {
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin-top:4px;
+}
+.progress-pip {
+    width:24px; height:8px;
+    display:flex; align-items:center;
+    cursor:pointer;
+    padding:0; background:none; border:none;
+}
+.progress-pip::before {
+    content:'';
+    display:block; width:100%; height:1px;
+    background:rgba(200,205,216,0.15);
+    transition: background 0.8s ease, width 0.8s ease, height 0.2s ease;
+}
+.progress-pip:hover::before { height:2px; background:rgba(200,205,216,0.4); }
+.progress-pip.done::before   { background:rgba(200,205,216,0.6); }
+.progress-pip.active::before { background:#e8c97a; width:36px; }
+
+/* ── Playback controls ── */
+#controls {
+    display:flex; align-items:center; gap:14px;
+    margin-top:10px;
+}
+.ctrl-btn {
+    background:none; border:1px solid rgba(200,205,216,0.25);
+    color:rgba(200,205,216,0.65);
+    width:30px; height:30px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:12px;
+    transition: border-color 0.3s ease, color 0.3s ease, background 0.3s ease;
+    font-family:'Courier Prime', monospace;
+}
+.ctrl-btn:hover {
+    border-color:rgba(232,201,122,0.6);
+    color:#e8c97a;
+    background:rgba(232,201,122,0.08);
+}
+.ctrl-btn:focus-visible { outline:1px solid #e8c97a; outline-offset:2px; }
+
+/* ════════════════════════════════════════════════
+   SCENE CARD
+════════════════════════════════════════════════ */
+#sceneArea {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    position:relative;
+    z-index:2;
+    padding: 20px 0;
+}
+
+.scene-card {
+    position:absolute;
+    top:0; left:0; right:0; bottom:0;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    opacity:0;
+    transform:translateY(14px);
+    transition: opacity 0.55s cubic-bezier(0.25,0,0.1,1),
+                transform 0.55s cubic-bezier(0.25,0,0.1,1);
+    pointer-events:none;
+    overflow-y:auto; overscroll-behavior:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+}
+.scene-card::-webkit-scrollbar { display:none; }
+.scene-card.entering {
+    opacity:1;
+    transform:translateY(0);
+    pointer-events:auto;
+}
+.scene-card.exiting {
+    opacity:0;
+    transform:translateY(-14px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.scene-eyebrow {
+    font-family:'Courier Prime', monospace;
+    font-size:clamp(0.45rem, 0.75vw, 0.62rem);
+    letter-spacing:0.55em;
+    text-transform:uppercase;
+    color:#e8c97a;
+    margin-bottom:22px;
+    opacity:0.8;
+}
+
+.scene-title {
+    font-size:clamp(2rem, 3.8vw, 3.4rem);
+    font-weight:300;
+    line-height:1.12;
+    letter-spacing:0.02em;
+    color:#f0f2f5;
+    margin-bottom:32px;
+}
+.scene-title em {
+    font-style:italic;
+    color:#e8c97a;
+}
+
+.scene-body {
+    font-size:clamp(0.88rem, 1.3vw, 1.08rem);
+    font-weight:300;
+    line-height:1.9;
+    color:rgba(200,205,216,0.72);
+    max-width:420px;
+}
+.scene-body em {
+    font-style:italic;
+    color:rgba(220,225,235,0.88);
+}
+.scene-body strong {
+    font-weight:600;
+    color:rgba(232,201,122,0.85);
+    font-style:normal;
+}
+
+.scene-formula {
+    margin-top:28px;
+    padding:18px 22px;
+    border-left:2px solid rgba(232,201,122,0.3);
+    background:rgba(232,201,122,0.04);
+    border-radius:0 6px 6px 0;
+}
+.scene-formula p {
+    font-family:'Courier Prime', monospace;
+    font-size:clamp(0.72rem, 1.1vw, 0.92rem);
+    letter-spacing:0.08em;
+    color:rgba(232,201,122,0.75);
+    line-height:1.8;
+}
+.scene-formula p span {
+    color:rgba(200,205,216,0.5);
+    font-size:0.85em;
+}
+
+/* ════════════════════════════════════════════════
+   BOTTOM
+════════════════════════════════════════════════ */
+#bottomRow {
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    position:relative;
+    z-index:2;
+}
+
+#authorCredit {
+    font-family:'Cormorant Garamond', serif;
+    font-style:italic;
+    font-size:clamp(0.75rem, 1.1vw, 0.92rem);
+    letter-spacing:0.1em;
+    color:rgba(200,205,216,0.3);
+    line-height:1.8;
+}
+#authorCredit strong {
+    font-style:normal;
+    font-weight:400;
+    color:rgba(200,205,216,0.5);
+    display:block;
+}
+
+#timerBar {
+    width:120px;
+    height:1px;
+    background:rgba(200,205,216,0.08);
+    position:relative;
+    overflow:hidden;
+}
+#timerFill {
+    position:absolute;
+    left:0; top:0; height:100%;
+    background:rgba(232,201,122,0.5);
+    width:0%;
+    transition:width 0.2s linear;
+}
+
+/* ════════════════════════════════════════════════
+   CANVAS LEFT — geometry labels
+════════════════════════════════════════════════ */
+#geoLabels {
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:5;
+}
+.geo-label {
+    position:absolute;
+    font-family:'Courier Prime', monospace;
+    font-size:clamp(0.4rem, 0.65vw, 0.58rem);
+    letter-spacing:0.3em;
+    color:rgba(200,205,216,0.45);
+    text-transform:uppercase;
+    white-space:nowrap;
+    opacity:0;
+    transition:opacity 1s ease;
+}
+.geo-label.show { opacity:1; }
+
+/* ════════════════════════════════════════════════
+   STAR FIELD
+════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════
+   NARROW SCREENS — stack canvas above narrative
+   instead of squeezing both into 50% width
+════════════════════════════════════════════════ */
+@media (max-width: 860px) {
+    #stage { grid-template-columns:1fr; grid-template-rows:34vh 1fr; grid-template-rows:34dvh 1fr; }
+    #canvasWrap { border-right:none; border-bottom:1px solid rgba(255,255,255,0.04); }
+    #canvasWrap::after {
+        background:
+            radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(5,6,10,0.5) 100%),
+            linear-gradient(to bottom, transparent 55%, rgba(5,6,10,0.85) 100%);
+    }
+    #narrativeWrap { padding:18px 20px 16px 20px; }
+    .scene-title { font-size:clamp(24px,7vw,36px); }
+    .scene-body  { font-size:clamp(13px,3.6vw,16px); max-width:none; }
+}
+
+/* ════════════════════════════════════════════════
+   SHORT SCREENS — vertical space is scarce here,
+   independent of width; never touches grid structure
+════════════════════════════════════════════════ */
+@media (max-height: 640px) {
+    #narrativeWrap { padding-top:10px; padding-bottom:10px; }
+    .scene-eyebrow { font-size:8px; margin-bottom:6px; }
+    .scene-title { font-size:clamp(20px,4vw,28px); line-height:1.05; margin-bottom:8px; }
+    .scene-body  { font-size:clamp(12px,2.2vw,14px); line-height:1.45; }
+    .scene-formula { margin-top:8px; padding:8px 12px; }
+    .scene-formula p { line-height:1.4; }
+}
+@media (max-width: 860px) and (max-height: 640px) {
+    #stage { grid-template-rows:22vh 1fr; grid-template-rows:22dvh 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="stage">
+
+    <!-- LEFT: animation -->
+    <div id="canvasWrap">
+        <canvas id="mainCanvas"></canvas>
+        <div id="geoLabels">
+            <div class="geo-label" id="lbl-outer"  style="left:10%; top:12%;">Büyük çember · R</div>
+            <div class="geo-label" id="lbl-inner"  style="left:8%;  top:72%;">Küçük çember · R/2</div>
+            <div class="geo-label" id="lbl-point"  style="left:62%; top:20%;">İz noktası · P</div>
+            <div class="geo-label" id="lbl-line"   style="left:12%; top:50%;">Doğrusal salınım</div>
+            <div class="geo-label" id="lbl-trail"  style="left:50%; top:75%;">Çizilen iz</div>
+        </div>
+    </div>
+
+    <!-- RIGHT: narrative -->
+    <div id="narrativeWrap">
+
+        <div id="topMeta">
+            <div>
+                <div class="meta-label">
+                    Nasīr al-Dīn al-Ṭūsī
+                    <strong>1201 – 1274</strong>
+                </div>
+                <div class="meta-label" style="margin-top:8px;">
+                    Tusi Çifti · <em style="font-style:italic; color:rgba(200,205,216,0.4);">al-zūj al-Ṭūsī</em>
+                    <strong>1247, Tahrir al-Majisti</strong>
+                </div>
+            </div>
+            <div>
+                <div class="meta-label" style="text-align:right; margin-bottom:8px;">İlerleme</div>
+                <div class="progress-track" id="progressTrack"></div>
+                <div id="controls">
+                    <button class="ctrl-btn" id="btnPrev" aria-label="Önceki bölüm" title="Önceki (←)">◂</button>
+                    <button class="ctrl-btn" id="btnPlay" aria-label="Duraklat/Oynat" title="Duraklat/Oynat (Boşluk)">❚❚</button>
+                    <button class="ctrl-btn" id="btnNext" aria-label="Sonraki bölüm" title="Sonraki (→)">▸</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="sceneArea"></div>
+
+        <div id="bottomRow">
+            <div id="authorCredit">
+                <strong>Hüseyin Rahmi Göktaş</strong>
+                Dijital Enstalasyon, 2025
+            </div>
+            <div>
+                <div class="meta-label" style="text-align:right; margin-bottom:6px;">Sonraki bölüm</div>
+                <div id="timerBar"><div id="timerFill"></div></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════
+   SCENES
+════════════════════════════════════════════════ */
+const SCENES = [
+{
+    dur: 20,
+    eyebrow: "Tanıtım",
+    title: "13. yüzyılın\n<em>en büyük</em> zihni",
+    body: `<strong>Nasīr al-Dīn al-Ṭūsī</strong> (1201–1274) yalnızca bir matematikçi değildi.<br><br>
+           Gökbilimci, filozof, teolog, mühendis — ve İlhanlı sarayının baş bilim danışmanı. Hülagü Han'ı ikna ederek
+           <strong>Merağa Rasathanesi'ni</strong> kurdurdu; devrinin en büyük gözlem ve araştırma merkezini inşa etti.<br><br>
+           Astronomiden mantığa, etikten trigonometriye <strong>150'den fazla eser</strong> bıraktı.
+           Şimdi göreceğimiz buluş, bu devasa mirasın yalnızca <em>tek bir parçası</em> —
+           ama etkisi üç yüzyıl sonra Avrupa'ya kadar ulaşacak kadar büyük.`,
+    anim: 'intro',
+    labels: [],
+},
+{
+    dur: 16,
+    eyebrow: "Sorun",
+    title: "Daireden\ndoğan <em>doğru</em>",
+    body: `Bir daire başka bir daireyi nasıl doğurur? Ve bu iki döngüden nasıl mükemmel bir düz çizgi çıkar?<br><br>
+           Bu soyut bir oyun değildi. Ptolemaios'un gezegen modelleri, gözlemlerle uyuşmak için fiziksel olarak imkânsız bir hileye —
+           <strong>equant</strong> noktasına — dayanıyordu.<br><br>
+           Tusi, 1247'de <em>Tahrir al-Majisti</em> adlı eserinde bu soruna, gezegenlerin gerçek hareketiyle tutarlı bir çözüm buldu.`,
+    anim: 'intro',
+    labels: [],
+},
+{
+    dur: 18,
+    eyebrow: "Adım 1 · Büyük Çember",
+    title: "Her şey bir\ndaire ile başlar",
+    body: `Yarıçapı <strong>R</strong> olan sabit bir büyük çember. Yerinden kımıldamıyor.<br><br>
+           Ptolemaios'tan beri astronomlar gökyüzündeki tüm hareketleri dairelerle açıklamaya çalışıyordu.
+           Sorun şuydu: bazı gezegen hareketleri düz bir çizgi gibi görünüyordu. <em>Dairesel hareket bunu verebilir miydi?</em>`,
+    anim: 'show_outer',
+    labels: ['lbl-outer'],
+},
+{
+    dur: 18,
+    eyebrow: "Adım 2 · Küçük Çember",
+    title: "İçine yerleştirilen\nbir başkası",
+    body: `Tusi'nin hamlesi: büyük çemberin içine, <strong>yarıçapı tam olarak R/2</strong> olan ikinci bir çember yerleştir.<br><br>
+           Küçük çember büyük çemberin içinde döner — kendi ekseni etrafında, tam <strong>iki kat hızda ve ters yönde.</strong>
+           Bu seçim rasgele değil; matematiksel bir zorunluluktur.`,
+    anim: 'show_inner',
+    labels: ['lbl-outer','lbl-inner'],
+    formula: ['R(büyük) = 2 × r(küçük)', 'ω(küçük) = −2 × ω(büyük)']
+},
+{
+    dur: 20,
+    eyebrow: "Adım 3 · İz Noktası",
+    title: "Kenar üzerindeki\nbir nokta",
+    body: `Küçük çemberin kenarına bir nokta işaretle. Şimdi izle.<br><br>
+           <em>İki dairesel hareket birleşince, bu nokta mükemmel bir doğru boyunca ileri geri salınır.</em>
+           Büyük çemberin tam çapı kadar uzunlukta, hiç sapmadan.`,
+    anim: 'show_point',
+    labels: ['lbl-outer','lbl-inner','lbl-point'],
+},
+{
+    dur: 20,
+    eyebrow: "Adım 4 · Doğrusal Salınım",
+    title: "Daireden\ndoğan düz çizgi",
+    body: `Noktanın bıraktığı ize bak. <strong>Mükemmel bir doğru parçası.</strong> Eğrilik yok, sapma yok.<br><br>
+           İki döngüsel hareket, tam doğru oranlarla birleşince birbirini iptal eder —
+           ve geriye yalnızca saf doğrusal hareket kalır.<br><br>
+           <em>Bu, geometrinin büyüsüdür.</em>`,
+    anim: 'show_line',
+    labels: ['lbl-outer','lbl-inner','lbl-point','lbl-line'],
+    formula: ['P(t) = R · cos(ωt) · x̂', 'x ∈ [−R, +R], y = 0']
+},
+{
+    dur: 18,
+    eyebrow: "Adım 5 · Çizilen İz",
+    title: "Tam turda\nbir elips değil —",
+    body: `Nokta bir tur boyunca tam diyametri çizer. Sonra geri döner. Aynı yol, defalarca.<br><br>
+           Matematiksel adı: <strong>iki tepeli hiposikloid</strong> (two-cusped hypocycloid).<br><br>
+           Ama Tusi bunu formülle değil, <em>gözlemle ve saf geometrik akıl yürütmeyle</em> buldu.
+           1247'de. Bilgisayar olmadan.`,
+    anim: 'show_trail',
+    labels: ['lbl-outer','lbl-inner','lbl-point','lbl-line','lbl-trail'],
+},
+{
+    dur: 20,
+    eyebrow: "Önemi",
+    title: "Ptolemaios'un\nsorunu,\nTusi'nin çözümü",
+    body: `Antik Yunan gök mekaniği bir çelişkiyle yaşıyordu: bazı gezegen hareketleri düz görünüyordu,
+           ama evren dairelerden yapılmıştı.<br><br>
+           Tusi Çifti bu çelişkiyi kapattı. <strong>Düz hareketi dairesel hareketle üretmenin yolunu gösterdi.</strong><br><br>
+           <em>250 yıl sonra Kopernik, kendi modelinde aynı mekanizmayı kullandı.</em>
+           İkisinin çizimleri o kadar benzerdir ki tarihçiler hâlâ şaşkınlık içindedir.`,
+    anim: 'full',
+    labels: ['lbl-outer','lbl-inner','lbl-point','lbl-line'],
+    formula: ['1247 · Tusi · Tahrir al-Majisti', '1543 · Kopernik · De Revolutionibus']
+},
+{
+    dur: 18,
+    eyebrow: "Miras",
+    title: "Bir keşfin\nyolculuğu",
+    body: `Tus, İran → Marağa Rasathanesi → Bizans → Avrupa.<br><br>
+           Tusi'nin adı bugün trigonometrinin kurucusu olarak da geçer. Küresel üçgenler için sinüs yasasını,
+           tanjant yasasını ilk kez ifade etti.<br><br>
+           Ama Tusi Çifti, onun en <em>zarif</em> hediyesidir insanlığa —
+           <strong>saf geometrinin saf mükemmelliği.</strong>`,
+    anim: 'full',
+    labels: ['lbl-outer','lbl-inner','lbl-point','lbl-trail'],
+},
+];
+
+/* ════════════════════════════════════════════════
+   PROGRESS PIPS
+════════════════════════════════════════════════ */
+const track = document.getElementById('progressTrack');
+SCENES.forEach((_,i) => {
+    const p = document.createElement('button');
+    p.className = 'progress-pip';
+    p.id = `pip-${i}`;
+    p.setAttribute('aria-label', `${i+1}. bölüme git`);
+    p.addEventListener('click', () => { showScene(i); });
+    track.appendChild(p);
+});
+
+function updatePips(idx) {
+    SCENES.forEach((_,i) => {
+        const p = document.getElementById(`pip-${i}`);
+        p.className = 'progress-pip' + (i < idx ? ' done' : i === idx ? ' active' : '');
+    });
+}
+
+/* ════════════════════════════════════════════════
+   SCENE MANAGER
+════════════════════════════════════════════════ */
+let sceneIdx = 0;
+let sceneElapsed = 0;
+let currentCard = null;
+const sceneArea = document.getElementById('sceneArea');
+const timerFill = document.getElementById('timerFill');
+
+function buildCard(s) {
+    const d = document.createElement('div');
+    d.className = 'scene-card';
+
+    let html = '';
+    if (s.eyebrow) html += `<div class="scene-eyebrow">${s.eyebrow}</div>`;
+    html += `<div class="scene-title">${s.title.replace(/\n/g,'<br>')}</div>`;
+    html += `<div class="scene-body">${s.body}</div>`;
+    if (s.formula) {
+        html += `<div class="scene-formula">` + s.formula.map(f =>
+            `<p>${f.split('·').map((seg,i) => i%2===1 ? `<span>· ${seg} ·</span>` : seg).join('')}</p>`
+        ).join('') + `</div>`;
+    }
+    d.innerHTML = html;
+    return d;
+}
+
+function showScene(idx) {
+    // exit old
+    if (currentCard) {
+        currentCard.classList.remove('entering');
+        currentCard.classList.add('exiting');
+        const old = currentCard;
+        setTimeout(() => old.remove(), 450);
+    }
+    // hide all labels
+    document.querySelectorAll('.geo-label').forEach(el => el.classList.remove('show'));
+
+    sceneIdx = idx;
+    sceneElapsed = 0;
+    const s = SCENES[idx];
+
+    const card = buildCard(s);
+    sceneArea.appendChild(card);
+    requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add('entering')));
+    currentCard = card;
+
+    updatePips(idx);
+
+    // show relevant labels after short delay
+    setTimeout(() => {
+        (s.labels || []).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('show');
+        });
+    }, 800);
+}
+
+showScene(0);
+
+/* ════════════════════════════════════════════════
+   PLAYBACK CONTROLS — pause, prev, next, keyboard
+════════════════════════════════════════════════ */
+let isPaused = false;
+const btnPlay = document.getElementById('btnPlay');
+const btnPrev = document.getElementById('btnPrev');
+const btnNext = document.getElementById('btnNext');
+
+function goPrev() { showScene((sceneIdx - 1 + SCENES.length) % SCENES.length); }
+function goNext() { showScene((sceneIdx + 1) % SCENES.length); }
+function togglePause() {
+    isPaused = !isPaused;
+    btnPlay.textContent = isPaused ? '▸' : '❚❚';
+    btnPlay.setAttribute('aria-label', isPaused ? 'Oynat' : 'Duraklat');
+}
+
+btnPrev.addEventListener('click', goPrev);
+btnNext.addEventListener('click', goNext);
+btnPlay.addEventListener('click', togglePause);
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') { goNext(); }
+    else if (e.key === 'ArrowLeft') { goPrev(); }
+    else if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+});
+
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ════════════════════════════════════════════════
+   MAIN CANVAS — GEOMETRY
+════════════════════════════════════════════════ */
+const canvas = document.getElementById('mainCanvas');
+const ctx    = canvas.getContext('2d');
+
+let W, H, CX, CY, R;
+
+function resize() {
+    W = canvas.width  = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+    CX = W/2; CY = H/2;
+    R  = Math.min(W, H) * 0.32;
+}
+resize();
+window.addEventListener('resize', resize);
+
+/* ── Draw state ── */
+// Anim modes: intro | show_outer | show_inner | show_point | show_line | show_trail | show_line_only | full
+let animMode   = 'intro';
+let trailPts   = [];
+let trailMaxLen = 600;
+let phi        = 0; // outer angle
+let elapsedT   = 0; // total elapsed seconds, for gentle ambient pulsing
+let showOuterOpacity = 0;
+let showInnerOpacity = 0;
+let showPointOpacity = 0;
+let showLineOpacity  = 0;
+let showTrailOpacity = 0;
+
+const ANIM_TARGETS = {
+    intro:      { outer:0.22, inner:0.18, point:0.35, line:0.2,  trail:0.45 },
+    show_outer: { outer:1,   inner:0,   point:0,   line:0,   trail:0 },
+    show_inner: { outer:1,   inner:1,   point:0,   line:0,   trail:0 },
+    show_point: { outer:1,   inner:1,   point:1,   line:0,   trail:0 },
+    show_line:  { outer:0.4, inner:0.7, point:1,   line:1,   trail:0 },
+    show_trail: { outer:0.4, inner:0.7, point:1,   line:0.5, trail:1 },
+    show_line_only:{ outer:0.3, inner:0.4, point:0.8, line:1, trail:0.2 },
+    full:       { outer:0.7, inner:0.8, point:1,   line:0.6, trail:0.6 },
+};
+
+function lerp(a, b, t) { return a + (b-a)*t; }
+
+function drawFrame(dt) {
+    phi += dt * (prefersReducedMotion ? 0.12 : 0.55); // rotation speed
+    elapsedT += dt;
+
+    // Lerp opacities
+    const tgt = ANIM_TARGETS[animMode] || ANIM_TARGETS.full;
+    const sp = 0.018;
+    showOuterOpacity = lerp(showOuterOpacity, tgt.outer, sp*60*dt);
+    showInnerOpacity = lerp(showInnerOpacity, tgt.inner, sp*60*dt);
+    showPointOpacity = lerp(showPointOpacity, tgt.point, sp*60*dt);
+    showLineOpacity  = lerp(showLineOpacity,  tgt.line,  sp*60*dt);
+    showTrailOpacity = lerp(showTrailOpacity, tgt.trail, sp*60*dt);
+
+    // Tusi geometry
+    const r     = R / 2;
+    // Inner circle radius r=R/2, spinning at -2× the outer angular speed —
+    // Inner center
+    const iCX   = CX + r * Math.cos(phi);
+    const iCY   = CY + r * Math.sin(phi);
+    // Point P on the inner circle's circumference (r=R/2, ω_inner=-2ω_outer)
+    // reduces algebraically to a pure linear oscillation along the outer diameter —
+    // this is the Tusi couple's defining result, computed directly below.
+    const tracePx = CX + R * Math.cos(phi);
+    const tracePy = CY;
+
+    // Trail
+    if (showTrailOpacity > 0.05) {
+        trailPts.push({ x: tracePx, y: tracePy });
+        if (trailPts.length > trailMaxLen) trailPts.shift();
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    /* ── Subtle radial glow center — gently breathing ── */
+    const pulse = 0.85 + 0.15 * Math.sin(elapsedT * 0.6);
+    const grd = ctx.createRadialGradient(CX, CY, 0, CX, CY, R*1.4);
+    grd.addColorStop(0, `rgba(232,201,122,${0.04*pulse})`);
+    grd.addColorStop(1, 'rgba(5,6,10,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0,0,W,H);
+
+    /* ── Trail ── */
+    if (trailPts.length > 1 && showTrailOpacity > 0.01) {
+        ctx.beginPath();
+        ctx.moveTo(trailPts[0].x, trailPts[0].y);
+        for (let i=1; i<trailPts.length; i++) ctx.lineTo(trailPts[i].x, trailPts[i].y);
+        ctx.strokeStyle = `rgba(232,201,122,${showTrailOpacity * 0.85})`;
+        ctx.lineWidth   = 2;
+        ctx.lineCap     = 'round';
+        ctx.stroke();
+    }
+
+    /* ── Linear oscillation line ── */
+    if (showLineOpacity > 0.01) {
+        ctx.beginPath();
+        ctx.moveTo(CX - R, CY);
+        ctx.lineTo(CX + R, CY);
+        ctx.strokeStyle = `rgba(232,201,122,${showLineOpacity * 0.9})`;
+        ctx.lineWidth   = 2;
+        ctx.setLineDash([4, 8]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Endpoint ticks
+        [-1,1].forEach(side => {
+            ctx.beginPath();
+            ctx.moveTo(CX + side*R, CY-8);
+            ctx.lineTo(CX + side*R, CY+8);
+            ctx.strokeStyle = `rgba(232,201,122,${showLineOpacity * 0.75})`;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        });
+    }
+
+    /* ── Outer circle ── */
+    if (showOuterOpacity > 0.01) {
+        ctx.beginPath();
+        ctx.arc(CX, CY, R, 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(180,195,225,${showOuterOpacity * 0.85})`;
+        ctx.lineWidth   = 2;
+        ctx.stroke();
+
+        // Center dot
+        ctx.beginPath();
+        ctx.arc(CX, CY, 3, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(180,195,225,${showOuterOpacity * 0.7})`;
+        ctx.fill();
+    }
+
+    /* ── Orbit radius arm (outer center → inner center) ── */
+    if (showInnerOpacity > 0.02) {
+        ctx.beginPath();
+        ctx.moveTo(CX, CY);
+        ctx.lineTo(iCX, iCY);
+        ctx.strokeStyle = `rgba(180,195,225,${showInnerOpacity * 0.35})`;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2,6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    /* ── Inner circle ── */
+    if (showInnerOpacity > 0.01) {
+        ctx.beginPath();
+        ctx.arc(iCX, iCY, r, 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(120,180,240,${showInnerOpacity * 0.95})`;
+        ctx.lineWidth   = 2;
+        ctx.stroke();
+
+        // Inner center
+        ctx.beginPath();
+        ctx.arc(iCX, iCY, 2.5, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(120,180,240,${showInnerOpacity * 0.85})`;
+        ctx.fill();
+    }
+
+    /* ── Inner radius arm (inner center → point) ── */
+    if (showPointOpacity > 0.02 && showInnerOpacity > 0.02) {
+        ctx.beginPath();
+        ctx.moveTo(iCX, iCY);
+        ctx.lineTo(tracePx, tracePy);
+        ctx.strokeStyle = `rgba(120,180,240,${Math.min(showPointOpacity, showInnerOpacity) * 0.4})`;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2,5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    /* ── Point P on the line ── */
+    if (showPointOpacity > 0.01) {
+        // Glow
+        const ptGrd = ctx.createRadialGradient(tracePx, tracePy, 0, tracePx, tracePy, 28);
+        ptGrd.addColorStop(0, `rgba(232,201,122,${showPointOpacity * 0.35})`);
+        ptGrd.addColorStop(1, 'rgba(232,201,122,0)');
+        ctx.fillStyle = ptGrd;
+        ctx.beginPath();
+        ctx.arc(tracePx, tracePy, 28, 0, Math.PI*2);
+        ctx.fill();
+
+        // Dot
+        ctx.beginPath();
+        ctx.arc(tracePx, tracePy, 5.5, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(232,201,122,${showPointOpacity})`;
+        ctx.fill();
+
+        // Outer ring
+        ctx.beginPath();
+        ctx.arc(tracePx, tracePy, 11, 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(232,201,122,${showPointOpacity * 0.35})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    /* ── Intro state: just the glow and slow outer ghost ── */
+    if (animMode === 'intro' && showOuterOpacity < 0.05) {
+        ctx.beginPath();
+        ctx.arc(CX, CY, R, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(150,165,190,0.06)';
+        ctx.lineWidth   = 1;
+        ctx.stroke();
+    }
+}
+
+/* ════════════════════════════════════════════════
+   ANIMATION LOOP
+════════════════════════════════════════════════ */
+let last = 0;
+function loop(now) {
+    requestAnimationFrame(loop);
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+
+    const s = SCENES[sceneIdx];
+
+    if (!isPaused) {
+        // advance scene
+        sceneElapsed += dt;
+        const frac = Math.min(sceneElapsed / s.dur, 1);
+        timerFill.style.width = (frac * 100) + '%';
+
+        if (sceneElapsed >= s.dur) {
+            showScene((sceneIdx + 1) % SCENES.length);
+        }
+    }
+
+    // sync anim mode
+    animMode = s.anim || 'full';
+
+    // geometry keeps drawing even when paused (static pose), but stops
+    // advancing phi so a paused reader isn't watching a frozen mid-spin frame
+    drawFrame(isPaused ? 0 : dt);
+}
+requestAnimationFrame(t => { last = t; requestAnimationFrame(loop); });
+
+</script>
+</body>
+</html>

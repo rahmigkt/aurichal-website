@@ -7,7 +7,7 @@
 
 class MukantaraSalon extends Immersion {
   constructor(engine) {
-    console.log("MUKANTARA SALON — build v3 (hologram + duvar ekranları)");
+    console.log("MUKANTARA SALON — build v4 (gömülü araçlar, sade duvarlar)");
     const config = {
       viewHeight: 1.75,
       skyboxSize: 300,
@@ -19,13 +19,8 @@ class MukantaraSalon extends Immersion {
     };
     super("mukantaraSalon", "dark", engine, config);
 
-    // -- Zemin: PCB/devre deseni doku (koyu zemin + parlayan devre izleri) --
-    const floorTex = this.createCircuitTexture("floorCircuit", { size: 1024, density: 70, lineWidth: 2.2, bg: "#050b14" });
-    floorTex.uScale = 7; floorTex.vScale = 7;
+    // -- Zemin: sade koyu lacivert-teal, hareketli doku yok (duvar dokusu rahatsız ediciydi) --
     this.ground.material.diffuseColor = new BABYLON.Color3(0.03, 0.05, 0.08);
-    this.ground.material.emissiveTexture = floorTex;
-    this.ground.material.diffuseTexture = floorTex;
-    this.ground.material.emissiveColor = new BABYLON.Color3(0.55, 0.55, 0.55);
     this.ground.material.specularColor = new BABYLON.Color3(0, 0, 0);
 
     // -- Kaide malzemesini pirinç/altın rengine çeviriyoruz --
@@ -67,14 +62,11 @@ class MukantaraSalon extends Immersion {
     // -- Galeri mimarisi: giriş koridoru + ilk salon + gelecekteki salonlara açık kapı --
     // Çok-odalı galerinin ilk parçası. Yeni salonlar eklendikçe bu fonksiyonlarla
     // (createCorridor / createRoomWithDoorway) genişletilecek — tek dosyadan yönetilebilir.
+    // -- Duvarlar: sade koyu düz renk (devre deseni ekranlara taşındı — duvarda
+    // yaklaşırken/uzaklaşırken rahatsız edici hareket yapıyordu) --
     this.wallMat = new BABYLON.StandardMaterial("wallMat", this);
     this.wallMat.diffuseColor = new BABYLON.Color3(0.03, 0.05, 0.08);
     this.wallMat.specularColor = new BABYLON.Color3(0, 0, 0);
-    const wallTex = this.createCircuitTexture("wallCircuit", { size: 1024, density: 34, lineWidth: 2, bg: "#050b14" });
-    wallTex.uScale = 3; wallTex.vScale = 1.4;
-    this.wallMat.emissiveTexture = wallTex;
-    this.wallMat.diffuseTexture = wallTex;
-    this.wallMat.emissiveColor = new BABYLON.Color3(0.6, 0.6, 0.6);
     this.wallH = 4.2;
 
     // Giriş koridoru: dar, salon öncesi geçiş hissi (z: 15 → 6)
@@ -93,11 +85,11 @@ class MukantaraSalon extends Immersion {
     });
 
     // -- Duvar ekranları: her kaidenin arkasında, tıklanınca ilgili dijital aracı
-    // yeni sekmede açan panel. Henüz aracı olmayanlar (ör. Halkalı Küre) sadece
-    // "Yakında" yazan, tıklanamaz bir panel olarak duruyor.
-    this.createWallScreen(-3, -5.85, "Halkalı Küre", "Yakında", null);
-    this.createWallScreen(0, -5.85, "Zerkâliyye", "İncele →", "https://mukantara.com/deneyimler/tusi-cifti/");
-    this.createWallScreen(3, -5.85, "Zerkâliyye", "İncele →", "https://mukantara.com/deneyimler/tusi-cifti/");
+    // AYNI SAYFA İÇİNDE (yeni sekmede değil) gömülü katman olarak açan panel.
+    // Gerçek MUKANTARA enstalasyonları — bkz. tools/ klasörü.
+    this.createWallScreen(-3, -5.85, "Tûsî Çifti", "İncele →", "tools/tusi-cifti.html");
+    this.createWallScreen(0, -5.85, "Halazûn", "İncele →", "tools/halazun.html");
+    this.createWallScreen(3, -5.85, "İbn Heysem Problemi", "İncele →", "tools/ibn-heysem.html");
 
     // -- Camlı vitrin: referans görseldeki merkezi cam kutu denemesi --
     // Şimdilik sadece orta kaidede (x=0) — konsept onaylanırsa diğerlerine uygulanır.
@@ -255,14 +247,34 @@ class MukantaraSalon extends Immersion {
     return holoRoot;
   }
 
-  // Duvara gömülü, tıklanınca dijital aracı yeni sekmede açan ekran paneli.
-  // url == null ise ekran sadece bilgi amaçlı durur, tıklanamaz.
+  // Duvara gömülü, tıklanınca dijital aracı SAYFA İÇİNDE (iframe katmanı, yeni
+  // sekmede değil) açan ekran paneli. Devre kartı deseni burada, doğrudan
+  // ekranın kendi dokusunda — 3D duvar yüzeyinde değil, o yüzden hareket etmiyor.
   createWallScreen(x, z, title, actionLabel, url) {
     const w = 1.6, h = 1.0;
     const dt = new BABYLON.DynamicTexture("screenTex_" + x, { width: 512, height: 320 }, this);
     const ctx = dt.getContext();
     ctx.fillStyle = "#04090b";
     ctx.fillRect(0, 0, 512, 320);
+    // devre deseni — sadece bu ekranın içinde, sabit, hareket etmiyor
+    ctx.strokeStyle = "#123842";
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 14; i++) {
+      let px = Math.random() * 512, py = Math.random() * 320;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      const segs = 2 + Math.floor(Math.random() * 3);
+      for (let s = 0; s < segs; s++) {
+        if (Math.random() < 0.5) px += (Math.random() < 0.5 ? 1 : -1) * (15 + Math.random() * 40);
+        else py += (Math.random() < 0.5 ? 1 : -1) * (15 + Math.random() * 40);
+        px = Math.max(4, Math.min(508, px));
+        py = Math.max(4, Math.min(316, py));
+        ctx.lineTo(px, py);
+      }
+      ctx.globalAlpha = 0.35;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     ctx.strokeStyle = url ? "#8fe9f5" : "#333333";
     ctx.lineWidth = 5;
     ctx.strokeRect(10, 10, 492, 300);
@@ -305,7 +317,8 @@ class MukantaraSalon extends Immersion {
       );
       screen.actionManager.registerAction(
         new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
-          this.openLink(url, title, true); // true = yeni sekmede aç, salon açık kalır
+          // Yeni sekme YOK — aynı sayfa üzerinde gömülü katman olarak açılır (bkz. index.html)
+          if (window.openEmbeddedTool) window.openEmbeddedTool(url, title);
         }),
       );
     }
@@ -359,5 +372,12 @@ class MukantaraSalon extends Immersion {
     const response = await fetch("salon.json");
     const data = await response.json();
     this.importData(data);
+    // Kütüphanenin varsayılan parlak yeşil/pembe "Exhibit/Display" işaretçilerini
+    // gizle — kullanıcı bunları görmek istemiyor, gömülü ekranlar zaten yeterli.
+    for (const id in this.stands) {
+      const st = this.stands[id];
+      if (st.standSign) st.standSign.isVisible = false;
+      if (st.standSignText) st.standSignText.isVisible = false;
+    }
   }
 }
