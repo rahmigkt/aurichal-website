@@ -82,6 +82,107 @@ class MukantaraSalon extends Immersion {
     this.createWallScreen(-3, -5.85, "Halkalı Küre", "Yakında", null);
     this.createWallScreen(0, -5.85, "Zerkâliyye", "İncele →", "https://mukantara.com/deneyimler/tusi-cifti/");
     this.createWallScreen(3, -5.85, "Zerkâliyye", "İncele →", "https://mukantara.com/deneyimler/tusi-cifti/");
+
+    // -- Hologram prototipi: Azimut Küre-Koni --
+    // Suudi Arabistan kürasyonu için üretilen AI konsept görsellerinin ilhamıyla,
+    // burada VİDEO değil GERÇEK, döndürülebilir 3D geometri olarak kuruldu.
+    // Halkalı Küre kaidesinin üstünde, henüz dijital aracı olmayan objenin
+    // "hologram companion"ı olarak duruyor — GlowLayer ile ışıldama efekti.
+    this.glow = new BABYLON.GlowLayer("glow", this, { mainTextureSamples: 2 });
+    this.glow.intensity = 0.9;
+    this.createAzimuthHologram(-3, -3.5, 1.35);
+  }
+
+  // Küreden (enlem/boylam kafesi + yıldız noktaları) aşağı, taban dairesine
+  // (eşmerkezli çemberler + ışınsal çizgiler) yakınsayan azimut çizgileri hologramı.
+  createAzimuthHologram(x, z, baseY) {
+    const cyan = new BABYLON.Color4(0.35, 0.85, 0.95, 1);
+    const cyanMat = new BABYLON.StandardMaterial("holoMat_" + x, this);
+    cyanMat.emissiveColor = new BABYLON.Color3(0.35, 0.85, 0.95);
+    cyanMat.disableLighting = true;
+    cyanMat.alpha = 0.85;
+
+    const holoRoot = new BABYLON.TransformNode("holoRoot_" + x, this);
+    holoRoot.position = new BABYLON.Vector3(x, 0, z);
+
+    const sphereY = baseY + 1.25, sphereR = 0.55;
+    const circleY = baseY + 0.55, circleR = 0.95;
+
+    // Küre kafesi: enlem + boylam çizgileri
+    const latLines = [];
+    for (let lat = -60; lat <= 60; lat += 30) {
+      const pts = [];
+      const rr = sphereR * Math.cos(BABYLON.Tools.ToRadians(lat));
+      const yy = sphereY + sphereR * Math.sin(BABYLON.Tools.ToRadians(lat));
+      for (let a = 0; a <= 360; a += 10) {
+        pts.push(new BABYLON.Vector3(rr * Math.cos(BABYLON.Tools.ToRadians(a)), yy, rr * Math.sin(BABYLON.Tools.ToRadians(a))));
+      }
+      latLines.push(pts);
+    }
+    for (let lon = 0; lon < 180; lon += 30) {
+      const pts = [];
+      for (let a = 0; a <= 360; a += 10) {
+        const rad = BABYLON.Tools.ToRadians(a);
+        pts.push(new BABYLON.Vector3(
+          sphereR * Math.cos(rad) * Math.cos(BABYLON.Tools.ToRadians(lon)),
+          sphereY + sphereR * Math.sin(rad),
+          sphereR * Math.cos(rad) * Math.sin(BABYLON.Tools.ToRadians(lon)),
+        ));
+      }
+      latLines.push(pts);
+    }
+    const sphereGrid = BABYLON.MeshBuilder.CreateLineSystem("holoSphere_" + x, { lines: latLines }, this);
+    sphereGrid.color = cyan; sphereGrid.parent = holoRoot; sphereGrid.applyFog = false;
+
+    // Yıldız noktaları (küre yüzeyinde rastgele küçük ışık noktaları)
+    for (let i = 0; i < 22; i++) {
+      const theta = Math.random() * Math.PI * 2, phi = Math.acos(2 * Math.random() - 1);
+      const star = BABYLON.MeshBuilder.CreateSphere("star_" + x + "_" + i, { diameter: 0.025 }, this);
+      star.position = new BABYLON.Vector3(
+        sphereR * Math.sin(phi) * Math.cos(theta),
+        sphereY + sphereR * Math.cos(phi) * 0.999,
+        sphereR * Math.sin(phi) * Math.sin(theta),
+      );
+      star.material = cyanMat;
+      star.parent = holoRoot;
+      star.applyFog = false;
+    }
+
+    // Koni çizgileri: küre alt yarımından taban dairesine yakınsayan ışınlar
+    const coneLines = [];
+    const N = 28;
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      const top = new BABYLON.Vector3(sphereR * 0.85 * Math.cos(a), sphereY - sphereR * 0.5, sphereR * 0.85 * Math.sin(a));
+      const bottom = new BABYLON.Vector3(circleR * Math.cos(a), circleY, circleR * Math.sin(a));
+      coneLines.push([top, bottom]);
+    }
+    const cone = BABYLON.MeshBuilder.CreateLineSystem("holoCone_" + x, { lines: coneLines }, this);
+    cone.color = cyan; cone.parent = holoRoot; cone.applyFog = false;
+
+    // Taban: eşmerkezli çemberler + ışınsal çizgiler (mukantara/azimut deseni)
+    const baseLines = [];
+    [circleR, circleR * 0.66, circleR * 0.33].forEach((r) => {
+      const pts = [];
+      for (let a = 0; a <= 360; a += 8) pts.push(new BABYLON.Vector3(r * Math.cos(BABYLON.Tools.ToRadians(a)), circleY, r * Math.sin(BABYLON.Tools.ToRadians(a))));
+      baseLines.push(pts);
+    });
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      baseLines.push([
+        new BABYLON.Vector3(0, circleY, 0),
+        new BABYLON.Vector3(circleR * Math.cos(a), circleY, circleR * Math.sin(a)),
+      ]);
+    }
+    const baseGrid = BABYLON.MeshBuilder.CreateLineSystem("holoBase_" + x, { lines: baseLines }, this);
+    baseGrid.color = cyan; baseGrid.parent = holoRoot; baseGrid.applyFog = false;
+
+    // Yavaş dönüş
+    this.registerBeforeRender(() => {
+      holoRoot.rotation.y += 0.0018;
+    });
+
+    return holoRoot;
   }
 
   // Duvara gömülü, tıklanınca dijital aracı yeni sekmede açan ekran paneli.
