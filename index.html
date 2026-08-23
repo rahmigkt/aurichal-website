@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta property="og:title" content="MUKANTARA — Sanal Salon" />
+  <title>MUKANTARA — Sanal Salon</title>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background:#0d0f0c; }
+    #renderCanvas { width: 100%; height: 100%; touch-action: none; }
+  </style>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+
+  <!-- BabylonJS -->
+  <script src="https://cdn.jsdelivr.net/npm/babylonjs@9.10.1/babylon.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babylonjs-loaders@9.10.1/babylonjs.loaders.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babylonjs-gui@9.10.1/babylon.gui.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babylonjs-materials@9.10.1/babylonjs.materials.min.js"></script>
+
+  <!-- Immersion engine (Apache 2.0 — bkz. LICENSE / NOTICE) -->
+  <script src="/immersion_engine/immersion.js"></script>
+  <script src="/immersion_engine/immersionUI.js"></script>
+  <script src="/immersion_engine/stands/Stand.js"></script>
+  <script src="/immersion_engine/stands/Display.js"></script>
+  <script src="/immersion_engine/stands/Plinth.js"></script>
+  <script src="/immersion_engine/stands/Teleporter.js"></script>
+  <script src="/immersion_engine/stands/Link.js"></script>
+
+  <!-- MUKANTARA salonu -->
+  <script src="salon.js"></script>
+
+  <script>
+    createImmersion(MukantaraSalon);
+  </script>
+</body>
+</html>
