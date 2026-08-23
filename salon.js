@@ -58,22 +58,63 @@ class MukantaraSalon extends Immersion {
       spot.intensity = 25;
     });
 
-    // -- Oda geometrisi: sade dört duvar (kaide/oda serbest tasarım) --
-    const wallMat = new BABYLON.StandardMaterial("wallMat", this);
-    wallMat.diffuseColor = new BABYLON.Color3(0.05, 0.065, 0.055);
-    wallMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    // -- Galeri mimarisi: giriş koridoru + ilk salon + gelecekteki salonlara açık kapı --
+    // Çok-odalı galerinin ilk parçası. Yeni salonlar eklendikçe bu fonksiyonlarla
+    // (createCorridor / createRoomWithDoorway) genişletilecek — tek dosyadan yönetilebilir.
+    this.wallMat = new BABYLON.StandardMaterial("wallMat", this);
+    this.wallMat.diffuseColor = new BABYLON.Color3(0.05, 0.065, 0.055);
+    this.wallMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    this.wallH = 4.2;
 
-    const roomW = 14, roomD = 12, roomH = 4.2;
-    const back = BABYLON.MeshBuilder.CreateBox("wallBack", { width: roomW, height: roomH, depth: 0.2 }, this);
-    back.position = new BABYLON.Vector3(0, roomH / 2, -roomD / 2);
-    back.material = wallMat;
-    const left = BABYLON.MeshBuilder.CreateBox("wallLeft", { width: 0.2, height: roomH, depth: roomD }, this);
-    left.position = new BABYLON.Vector3(-roomW / 2, roomH / 2, 0);
-    left.material = wallMat;
-    const right = BABYLON.MeshBuilder.CreateBox("wallRight", { width: 0.2, height: roomH, depth: roomD }, this);
-    right.position = new BABYLON.Vector3(roomW / 2, roomH / 2, 0);
-    right.material = wallMat;
-    [back, left, right].forEach(w => { w.checkCollisions = true; w.isPickable = false; this.shadowGenerator.addShadowCaster ? null : null; });
+    // Giriş koridoru: dar, salon öncesi geçiş hissi (z: 15 → 6)
+    this.createCorridor(0, 15, 6, 4);
+
+    // Ana salon: 14x12, arka duvarın ortasında 3m'lik kapı boşluğu bırakılıyor
+    // (gelecekteki 2. salona geçiş için — henüz o taraf boş/karanlık)
+    this.createRoomWithDoorway({
+      centerX: 0, frontZ: 6, backZ: -6, width: 14,
+      doorwayWidth: 3, doorwayHeight: 2.6,
+    });
+  }
+
+  // İki duvar arasında dar bir geçiş koridoru oluşturur
+  createCorridor(centerX, frontZ, backZ, width) {
+    const len = frontZ - backZ;
+    const midZ = (frontZ + backZ) / 2;
+    const left = BABYLON.MeshBuilder.CreateBox("corrLeft", { width: 0.2, height: this.wallH, depth: len }, this);
+    left.position = new BABYLON.Vector3(centerX - width / 2, this.wallH / 2, midZ);
+    left.material = this.wallMat;
+    const right = BABYLON.MeshBuilder.CreateBox("corrRight", { width: 0.2, height: this.wallH, depth: len }, this);
+    right.position = new BABYLON.Vector3(centerX + width / 2, this.wallH / 2, midZ);
+    right.material = this.wallMat;
+    [left, right].forEach(w => { w.checkCollisions = true; w.isPickable = false; });
+  }
+
+  // Sol/sağ duvarlı, arka duvarında ortada kapı boşluğu olan bir salon oluşturur
+  createRoomWithDoorway({ centerX, frontZ, backZ, width, doorwayWidth, doorwayHeight }) {
+    const depth = frontZ - backZ;
+    const midZ = (frontZ + backZ) / 2;
+    const left = BABYLON.MeshBuilder.CreateBox("roomLeft", { width: 0.2, height: this.wallH, depth }, this);
+    left.position = new BABYLON.Vector3(centerX - width / 2, this.wallH / 2, midZ);
+    left.material = this.wallMat;
+    const right = BABYLON.MeshBuilder.CreateBox("roomRight", { width: 0.2, height: this.wallH, depth }, this);
+    right.position = new BABYLON.Vector3(centerX + width / 2, this.wallH / 2, midZ);
+    right.material = this.wallMat;
+
+    // arka duvar: ortada kapı boşluğu bırakan iki parça + kapı üstü lento
+    const sidePieceW = (width - doorwayWidth) / 2;
+    const backL = BABYLON.MeshBuilder.CreateBox("roomBackL", { width: sidePieceW, height: this.wallH, depth: 0.2 }, this);
+    backL.position = new BABYLON.Vector3(centerX - doorwayWidth / 2 - sidePieceW / 2, this.wallH / 2, backZ);
+    backL.material = this.wallMat;
+    const backR = BABYLON.MeshBuilder.CreateBox("roomBackR", { width: sidePieceW, height: this.wallH, depth: 0.2 }, this);
+    backR.position = new BABYLON.Vector3(centerX + doorwayWidth / 2 + sidePieceW / 2, this.wallH / 2, backZ);
+    backR.material = this.wallMat;
+    const lintelH = this.wallH - doorwayHeight;
+    const lintel = BABYLON.MeshBuilder.CreateBox("roomLintel", { width: doorwayWidth, height: lintelH, depth: 0.2 }, this);
+    lintel.position = new BABYLON.Vector3(centerX, doorwayHeight + lintelH / 2, backZ);
+    lintel.material = this.wallMat;
+
+    [left, right, backL, backR, lintel].forEach(w => { w.checkCollisions = true; w.isPickable = false; });
   }
 
   async init() {
