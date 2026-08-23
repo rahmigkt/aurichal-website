@@ -19,8 +19,13 @@ class MukantaraSalon extends Immersion {
     };
     super("mukantaraSalon", "dark", engine, config);
 
-    // -- Zemin rengini de aynı koyu tona çek --
-    this.ground.material.diffuseColor = new BABYLON.Color3(0.03, 0.035, 0.03);
+    // -- Zemin: PCB/devre deseni doku (koyu zemin + parlayan devre izleri) --
+    const floorTex = this.createCircuitTexture("floorCircuit", { size: 1024, density: 70, lineWidth: 2.2 });
+    floorTex.uScale = 7; floorTex.vScale = 7;
+    this.ground.material.diffuseColor = new BABYLON.Color3(0.02, 0.03, 0.035);
+    this.ground.material.emissiveTexture = floorTex;
+    this.ground.material.diffuseTexture = floorTex;
+    this.ground.material.emissiveColor = new BABYLON.Color3(0.55, 0.55, 0.55);
     this.ground.material.specularColor = new BABYLON.Color3(0, 0, 0);
 
     // -- Kaide malzemesini pirinç/altın rengine çeviriyoruz --
@@ -63,8 +68,13 @@ class MukantaraSalon extends Immersion {
     // Çok-odalı galerinin ilk parçası. Yeni salonlar eklendikçe bu fonksiyonlarla
     // (createCorridor / createRoomWithDoorway) genişletilecek — tek dosyadan yönetilebilir.
     this.wallMat = new BABYLON.StandardMaterial("wallMat", this);
-    this.wallMat.diffuseColor = new BABYLON.Color3(0.05, 0.065, 0.055);
+    this.wallMat.diffuseColor = new BABYLON.Color3(0.02, 0.03, 0.03);
     this.wallMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    const wallTex = this.createCircuitTexture("wallCircuit", { size: 1024, density: 34, lineWidth: 2 });
+    wallTex.uScale = 3; wallTex.vScale = 1.4;
+    this.wallMat.emissiveTexture = wallTex;
+    this.wallMat.diffuseTexture = wallTex;
+    this.wallMat.emissiveColor = new BABYLON.Color3(0.6, 0.6, 0.6);
     this.wallH = 4.2;
 
     // Giriş koridoru: dar, salon öncesi geçiş hissi (z: 15 → 6)
@@ -89,14 +99,68 @@ class MukantaraSalon extends Immersion {
     this.createWallScreen(0, -5.85, "Zerkâliyye", "İncele →", "https://mukantara.com/deneyimler/tusi-cifti/");
     this.createWallScreen(3, -5.85, "Zerkâliyye", "İncele →", "https://mukantara.com/deneyimler/tusi-cifti/");
 
-    // -- Hologram prototipi: Azimut Küre-Koni --
-    // Suudi Arabistan kürasyonu için üretilen AI konsept görsellerinin ilhamıyla,
-    // burada VİDEO değil GERÇEK, döndürülebilir 3D geometri olarak kuruldu.
-    // Halkalı Küre kaidesinin üstünde, henüz dijital aracı olmayan objenin
-    // "hologram companion"ı olarak duruyor — GlowLayer ile ışıldama efekti.
+    // -- Camlı vitrin: referans görseldeki merkezi cam kutu denemesi --
+    // Şimdilik sadece orta kaidede (x=0) — konsept onaylanırsa diğerlerine uygulanır.
+    this.createVitrine(0, -3.5, { baseY: 0, width: 1.3, depth: 1.3, height: 2.1 });
+
     this.glow = new BABYLON.GlowLayer("glow", this, { mainTextureSamples: 2 });
-    this.glow.intensity = 0.9;
+    this.glow.intensity = 0.7;
     this.createAzimuthHologram(-3, -3.5, 1.35);
+  }
+
+  // Basit prosedürel PCB/devre kartı deseni: koyu zemin üstünde dik açılı,
+  // düğüm noktalı parlayan çizgiler. GlowLayer sahnede zaten aktif olduğu için
+  // burada ekstra blur/bulanıklaştırma yapmaya gerek yok — ışıma otomatik oluşuyor.
+  createCircuitTexture(name, { size = 1024, density = 40, lineWidth = 2, color = "#3ddbe8", bg = "#03080a" } = {}) {
+    const dt = new BABYLON.DynamicTexture(name, size, this, false);
+    const ctx = dt.getContext();
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = lineWidth;
+    for (let i = 0; i < density; i++) {
+      let x = Math.random() * size, y = Math.random() * size;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      const segs = 2 + Math.floor(Math.random() * 4);
+      for (let s = 0; s < segs; s++) {
+        if (Math.random() < 0.5) x += (Math.random() < 0.5 ? 1 : -1) * (20 + Math.random() * 90);
+        else y += (Math.random() < 0.5 ? 1 : -1) * (20 + Math.random() * 90);
+        x = Math.max(8, Math.min(size - 8, x));
+        y = Math.max(8, Math.min(size - 8, y));
+        ctx.lineTo(x, y);
+      }
+      ctx.globalAlpha = 0.5 + Math.random() * 0.4;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    dt.update();
+    dt.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
+    dt.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+    return dt;
+  }
+
+  // Camlı vitrin kutusu: hafif saydam cam + parlayan kenar çizgileri (edges rendering).
+  createVitrine(x, z, { baseY = 0, width = 1.3, depth = 1.3, height = 2.1 } = {}) {
+    const glassMat = new BABYLON.StandardMaterial("glassMat_" + x, this);
+    glassMat.diffuseColor = new BABYLON.Color3(0.5, 0.85, 0.95);
+    glassMat.alpha = 0.08;
+    glassMat.specularColor = new BABYLON.Color3(0.6, 0.9, 1);
+    glassMat.backFaceCulling = false;
+
+    const box = BABYLON.MeshBuilder.CreateBox("vitrine_" + x, { width, height, depth }, this);
+    box.position = new BABYLON.Vector3(x, baseY + height / 2, z);
+    box.material = glassMat;
+    box.isPickable = false;
+    box.checkCollisions = false;
+    box.enableEdgesRendering();
+    box.edgesWidth = 3.5;
+    box.edgesColor = new BABYLON.Color4(0.4, 0.9, 1, 1);
+    return box;
   }
 
   // Küreden (enlem/boylam kafesi + yıldız noktaları) aşağı, taban dairesine
@@ -197,24 +261,24 @@ class MukantaraSalon extends Immersion {
     const w = 1.6, h = 1.0;
     const dt = new BABYLON.DynamicTexture("screenTex_" + x, { width: 512, height: 320 }, this);
     const ctx = dt.getContext();
-    ctx.fillStyle = "#0a0d0a";
+    ctx.fillStyle = "#04090b";
     ctx.fillRect(0, 0, 512, 320);
-    ctx.strokeStyle = url ? "#a97b3c" : "#3a3a3a";
-    ctx.lineWidth = 6;
-    ctx.strokeRect(6, 6, 500, 308);
-    ctx.fillStyle = url ? "#e8d9b8" : "#777777";
-    ctx.font = "bold 56px Georgia";
+    ctx.strokeStyle = url ? "#8fe9f5" : "#333333";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(10, 10, 492, 300);
+    ctx.fillStyle = url ? "#eafcff" : "#777777";
+    ctx.font = "bold 52px Georgia";
     ctx.textAlign = "center";
     ctx.fillText(title, 256, 160);
-    ctx.font = "bold 34px Georgia";
-    ctx.fillStyle = url ? "#a97b3c" : "#555555";
+    ctx.font = "bold 32px Georgia";
+    ctx.fillStyle = url ? "#6fd7ea" : "#555555";
     ctx.fillText(actionLabel, 256, 215);
     dt.update();
 
     const mat = new BABYLON.StandardMaterial("screenMat_" + x, this);
     mat.diffuseTexture = dt;
     mat.emissiveTexture = dt;
-    mat.emissiveColor = new BABYLON.Color3(url ? 0.75 : 0.15, url ? 0.75 : 0.15, url ? 0.75 : 0.15);
+    mat.emissiveColor = new BABYLON.Color3(url ? 0.8 : 0.15, url ? 0.85 : 0.15, url ? 0.9 : 0.15);
     mat.specularColor = new BABYLON.Color3(0, 0, 0);
     mat.backFaceCulling = false;
 
