@@ -7,6 +7,7 @@
 
 class MukantaraSalon extends Immersion {
   constructor(engine) {
+    console.log("MUKANTARA SALON — build v3 (hologram + duvar ekranları)");
     const config = {
       viewHeight: 1.75,
       skyboxSize: 300,
