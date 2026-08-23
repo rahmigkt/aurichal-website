@@ -1,0 +1,1 @@
+import{_ as o}from"./BaseViewer-CQSnzYmX.js";import{I as e,o as t,c as r}from"./index-DvB7cfLo.js";import"./QuizResultDialog-DG0Uq34r.js";import"./config-ncZ3Gdmy.js";import"./QResizeObserver-Dt872S9w.js";const a="apex",l={__name:"ViewerApex",setup(n){return e(async()=>{console.log("onMounted Testviewer.vue: Start")}),(s,c)=>(t(),r(o,{modelId:a}))}};export{l as default};
