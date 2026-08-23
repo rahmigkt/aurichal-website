@@ -198,18 +198,19 @@ class MukantaraSalon extends Immersion {
     ctx.lineWidth = 6;
     ctx.strokeRect(6, 6, 500, 308);
     ctx.fillStyle = url ? "#e8d9b8" : "#777777";
-    ctx.font = "bold 40px Georgia";
+    ctx.font = "bold 56px Georgia";
     ctx.textAlign = "center";
-    ctx.fillText(title, 256, 150);
-    ctx.font = "28px Georgia";
+    ctx.fillText(title, 256, 160);
+    ctx.font = "bold 34px Georgia";
     ctx.fillStyle = url ? "#a97b3c" : "#555555";
-    ctx.fillText(actionLabel, 256, 210);
+    ctx.fillText(actionLabel, 256, 215);
     dt.update();
+    dt.uScale = -1; // duvara bakan yüzden doğru okunması için yatay çevir
 
     const mat = new BABYLON.StandardMaterial("screenMat_" + x, this);
     mat.diffuseTexture = dt;
     mat.emissiveTexture = dt;
-    mat.emissiveColor = new BABYLON.Color3(url ? 0.5 : 0.15, url ? 0.5 : 0.15, url ? 0.5 : 0.15);
+    mat.emissiveColor = new BABYLON.Color3(url ? 0.75 : 0.15, url ? 0.75 : 0.15, url ? 0.75 : 0.15);
     mat.specularColor = new BABYLON.Color3(0, 0, 0);
     mat.backFaceCulling = false;
 
