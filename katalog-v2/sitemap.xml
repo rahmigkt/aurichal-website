@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://casaaurea.art/</loc>
+    <lastmod>2026-08-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://casaaurea.art/products</loc>
+    <lastmod>2026-08-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://casaaurea.art/artist</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url><loc>https://casaaurea.art/products/clay-horizon</loc><lastmod>2026-08-13</lastmod><priority>0.8</priority></url>
+  <url><loc>https://casaaurea.art/products/threshold-vessel</loc><lastmod>2026-08-13</lastmod><priority>0.8</priority></url>
+  <url><loc>https://casaaurea.art/products/lumen-mirror</loc><lastmod>2026-08-13</lastmod><priority>0.8</priority></url>
+  <url><loc>https://casaaurea.art/products/quiet-matter</loc><lastmod>2026-08-13</lastmod><priority>0.8</priority></url>
+  <url><loc>https://casaaurea.art/products/earth-totem</loc><lastmod>2026-08-13</lastmod><priority>0.8</priority></url>
+  <url><loc>https://casaaurea.art/products/ochre-study</loc><lastmod>2026-08-13</lastmod><priority>0.8</priority></url>
+</urlset>
