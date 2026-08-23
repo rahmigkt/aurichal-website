@@ -1,0 +1,1 @@
+var e=`https://mukantara.com`;export{e as t};
