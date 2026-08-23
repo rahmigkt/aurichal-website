@@ -12,9 +12,9 @@ class MukantaraSalon extends Immersion {
       viewHeight: 1.75,
       skyboxSize: 300,
       // MUKANTARA marka paleti: --wall koyu yeşil-siyah tonu
-      skyColor: new BABYLON.Color3(0.035, 0.05, 0.04),
-      fogDensity: 0.018,
-      fogColor: new BABYLON.Color3(0.035, 0.05, 0.04),
+      skyColor: new BABYLON.Color3(0.05, 0.07, 0.06),
+      fogDensity: 0.006,
+      fogColor: new BABYLON.Color3(0.05, 0.07, 0.06),
       groundSize: 40,
     };
     super("mukantaraSalon", "dark", engine, config);
@@ -32,12 +32,12 @@ class MukantaraSalon extends Immersion {
 
     // -- Işıklar: loş genel aydınlatma + kaidelere sıcak spot --
     const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0, 1, 0), this);
-    hemi.intensity = 0.28;
-    hemi.diffuse = new BABYLON.Color3(0.85, 0.8, 0.65);
-    hemi.groundColor = new BABYLON.Color3(0.02, 0.02, 0.02);
+    hemi.intensity = 0.55;
+    hemi.diffuse = new BABYLON.Color3(0.9, 0.87, 0.78);
+    hemi.groundColor = new BABYLON.Color3(0.08, 0.08, 0.07);
 
     this.shadowLight = new BABYLON.DirectionalLight("shadowLight", new BABYLON.Vector3(-0.3, -1, 0.2), this);
-    this.shadowLight.intensity = 0.5;
+    this.shadowLight.intensity = 0.6;
     this.shadowLight.diffuse = new BABYLON.Color3(1, 0.85, 0.6);
     this.shadowGenerator = new BABYLON.ShadowGenerator(1024, this.shadowLight);
     this.shadowGenerator.useExponentialShadowMap = true;
@@ -56,7 +56,7 @@ class MukantaraSalon extends Immersion {
         Math.PI / 4, 8, this,
       );
       spot.diffuse = new BABYLON.Color3(1, 0.86, 0.62);
-      spot.intensity = 25;
+      spot.intensity = 45;
     });
 
     // -- Galeri mimarisi: giriş koridoru + ilk salon + gelecekteki salonlara açık kapı --
@@ -69,6 +69,11 @@ class MukantaraSalon extends Immersion {
 
     // Giriş koridoru: dar, salon öncesi geçiş hissi (z: 15 → 6)
     this.createCorridor(0, 15, 6, 4);
+
+    // Koridor için ek aydınlatma (girişten salona kadar tamamen karanlık kalmasın)
+    const corridorLight = new BABYLON.PointLight("corridorLight", new BABYLON.Vector3(0, 3.8, 10), this);
+    corridorLight.diffuse = new BABYLON.Color3(0.9, 0.85, 0.7);
+    corridorLight.intensity = 20;
 
     // Ana salon: 14x12, arka duvarın ortasında 3m'lik kapı boşluğu bırakılıyor
     // (gelecekteki 2. salona geçiş için — henüz o taraf boş/karanlık)
@@ -205,7 +210,6 @@ class MukantaraSalon extends Immersion {
     ctx.fillStyle = url ? "#a97b3c" : "#555555";
     ctx.fillText(actionLabel, 256, 215);
     dt.update();
-    dt.uScale = -1; // duvara bakan yüzden doğru okunması için yatay çevir
 
     const mat = new BABYLON.StandardMaterial("screenMat_" + x, this);
     mat.diffuseTexture = dt;
@@ -218,6 +222,7 @@ class MukantaraSalon extends Immersion {
       width: w, height: h, sideOrientation: BABYLON.Mesh.DOUBLESIDE,
     }, this);
     screen.position = new BABYLON.Vector3(x, 1.9, z);
+    screen.rotation.y = Math.PI; // duvara bakan yüzden doğru (ters olmayan) okunması için
     screen.material = mat;
     screen.isPickable = !!url;
 
