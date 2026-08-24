@@ -1,13 +1,13 @@
 {
-  "name": "Casa Áurea Toronto",
-  "short_name": "Casa Áurea",
-  "description": "Original paintings, handmade ceramics, and designer mirrors for Toronto interiors.",
-  "lang": "en-CA",
+  "name": "MUKANTARA — Altın Çağın Teknolojik Mirası",
+  "short_name": "MUKANTARA",
+  "description": "Prof. Dr. Fuat Sezgin koleksiyonundan İslam bilim ve teknoloji tarihi enstrümanlarının dijital kataloğu.",
+  "lang": "tr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#FAF8F3",
-  "theme_color": "#211E19",
+  "background_color": "#100e0c",
+  "theme_color": "#100e0c",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
