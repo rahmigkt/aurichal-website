@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NAKIŞ — Motif Films</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:#101218;color:#e9e2d2;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:24px max(16px,4vw)}
+h1{font:500 clamp(28px,5vw,48px)/1.1 "Cormorant Garamond",Georgia,serif;margin:0 0 6px;color:#f2c14e;letter-spacing:.04em}
+p.lead{margin:0 0 24px;opacity:.75;max-width:60ch}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:14px}
+a.card{display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit;background:#171a22;border:1px solid #2b303c;border-radius:10px;padding:12px;min-width:0}
+a.card:hover,a.card:focus-visible{border-color:#c59558;outline:none}
+canvas{width:100%;aspect-ratio:1;background:#f1e9d8;border-radius:6px}
+.tag{font-size:12px;letter-spacing:.12em;opacity:.6}
+.t{font:500 20px Georgia,serif}
+.b{font-size:13px;opacity:.7;line-height:1.4}
+</style>
+</head>
+<body>
+<h1>NAKIŞ · Motif Films</h1>
+<p class="lead">On bir referans desen, geometriden yeniden kuruldu. Her film sayıyı artırarak motifi oluşturur, çoğaltır, kumaş zeminine yerleştirir ve rengini değiştirir.</p>
+<div id="grid"></div>
+<script type="module">
+import {MOTIFS} from './motifs.js';
+const C={ink:'#1f4a9c',accent:'#c08a3e',soft:'#86a9dc',ground:'#f1e9d8',paper:'#fbf8f0'},g=document.getElementById('grid');
+for(const [k,M] of Object.entries(MOTIFS)){
+ const a=document.createElement('a');a.className='card';a.href='motif-film.html?m='+k;
+ const c=document.createElement('canvas');c.width=c.height=360;a.appendChild(c);
+ a.insertAdjacentHTML('beforeend',`<span class="tag">${M.tag}</span><span class="t">${M.title}</span><span class="b">${M.blurb}</span>`);g.appendChild(a);
+ const sh=M.build(M.counts.at(-1)),x=c.getContext('2d');let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+ for(const s of sh)for(const p of s.pts){x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]);}
+ const lim=M.noRepeat?.5:1,sc=Math.min(320/(x1-x0),320/(y1-y0))*(M.noRepeat?1.0:1),cx=(x0+x1)/2,cy=(y0+y1)/2;
+ x.fillStyle=C.ground;x.fillRect(0,0,360,360);x.lineJoin='round';x.lineWidth=1.5;
+ for(const s of sh){x.beginPath();s.pts.forEach((p,i)=>{const X=180+sc*(p[0]-cx),Y=180-sc*(p[1]-cy);i?x.lineTo(X,Y):x.moveTo(X,Y);});if(s.closed)x.closePath();
+  const col=C[s.tone]||'#000';if(s.fill){x.fillStyle=col;x.fill();}x.strokeStyle=C[s.edge||s.tone]||col;x.stroke();}
+}
+</script>
+</body>
+</html>

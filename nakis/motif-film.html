@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NAKIŞ — Motif Film</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0b0b0b;color:#e9e2d2;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:8px}
+#stage{position:relative;flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+canvas{height:100%;max-height:100%;max-width:100%;aspect-ratio:1080/1350;background:#121212;box-shadow:0 10px 50px #000a;border-radius:4px;touch-action:none}
+#bar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;width:min(100%,760px);font-size:14px}
+#bar button,#bar select{background:#1d1d1d;color:inherit;border:1px solid #444;border-radius:8px;padding:9px 14px;font:inherit;min-height:42px;cursor:pointer}
+#bar button:hover,#bar select:hover{border-color:#c59558}
+#seek{flex:1 1 200px;min-width:140px;accent-color:#c59558;height:30px}
+#tm{font-variant-numeric:tabular-nums;min-width:48px;text-align:center;opacity:.8}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c" width="1080" height="1350"></canvas></div>
+<div id="bar">
+ <button id="pp" aria-label="Play / pause">⏸</button>
+ <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Time">
+ <span id="tm">0:00</span>
+ <select id="m" aria-label="Motif"></select>
+ <button id="rec">● Record WebM</button>
+</div>
+<script type="module" src="motif-film.js"></script>
+</body>
+</html>
