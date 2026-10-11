@@ -12,7 +12,7 @@
 html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--line)}
 header b{letter-spacing:.2em;font-weight:500}header span{color:var(--mut);font-size:13px}
-button,select,input[type=text],textarea{font:inherit;color:inherit;background:var(--pn);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-height:38px}
+button,select,input[type=text],input[type=number],textarea{font:inherit;color:inherit;background:var(--pn);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-height:38px}
 button{cursor:pointer}button:hover{border-color:var(--acc)}button.pri{background:var(--acc);color:#141210;border-color:var(--acc);font-weight:600}
 #app{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:16px;padding:16px;max-width:1500px;margin:0 auto}
 @media(max-width:980px){#app{grid-template-columns:minmax(0,1fr)}}#app>*{min-width:0}#panel{overflow-x:hidden}
@@ -44,15 +44,25 @@ ul#layers button{padding:2px 8px;min-height:30px}
 textarea{width:100%;min-height:70px;resize:vertical}input[type=text]{width:100%}
 .desc{white-space:pre-wrap;font-size:13px;color:var(--mut);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:300px;overflow:auto}
 .btns{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+button:disabled,input:disabled,select:disabled{opacity:.45;cursor:default}
+.tracks{margin:14px 0;padding:8px;border:1px solid var(--line);border-radius:8px}
+.track-row{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;align-items:center;margin:8px 0}
+.track-name{font-size:12px;padding:6px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.track-name.active{border-color:var(--acc)}
+.track{height:40px;position:relative;background:var(--bg);border-radius:4px;margin:0 16px}
+.keyframe{position:absolute;top:3px;transform:translateX(-50%);padding:0;width:32px;min-height:34px;font-size:16px;border:0;background:transparent;color:var(--acc)}
+.playhead{position:absolute;top:0;bottom:0;border-left:1px solid var(--fg);pointer-events:none;opacity:.5}
+.ease-plot{display:block;width:128px;height:68px;margin:10px auto;color:var(--acc)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--acc);color:#141210;padding:8px 16px;border-radius:20px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9}#toast.on{opacity:1}
 </style>
 </head>
 <body>
-<header><div><b>NAKIŞ STUDIO</b> <span id="sub"></span></div><div><button id="lang">EN</button></div></header>
+<header><div><b>NAKIŞ STUDIO</b> <span id="sub"></span></div><div><button id="undo" data-act="undo" title="Ctrl/⌘ Z">Geri al</button> <button id="redo" data-act="redo" title="Ctrl/⌘ Shift Z">İleri al</button> <button id="lang">EN</button></div></header>
 <div id="app">
  <div id="stage">
-  <canvas id="c" width="1080" height="1350"></canvas>
-  <div id="tr"><button id="pp" class="pri"></button><input id="seek" type="range" min="0" max="1000" value="0"><span id="tm">0:00</span></div>
+  <canvas id="c" width="1080" height="1350" role="img" aria-label="NAKIŞ kompozisyon önizlemesi"></canvas>
+  <div id="tr"><button id="pp" class="pri"></button><input id="seek" type="range" min="0" max="1000" value="0"><span id="tm">0:00</span><button id="rec-stop" data-act="rec-stop" hidden>Kaydı bitir</button></div>
  </div>
  <div><div id="tabs"></div><div id="panel"></div></div>
 </div>

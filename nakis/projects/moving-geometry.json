@@ -1,0 +1,182 @@
+{
+  "v": 1,
+  "title": "Moving Geometry",
+  "subtitle": "A layered motion study",
+  "mark": "",
+  "palette": "custom",
+  "custom": {
+    "ground": "#ffffff",
+    "ink": "#171717",
+    "accent": "#626262",
+    "soft": "#9d9d9d"
+  },
+  "tex": false,
+  "repeat": "single",
+  "showcase": [],
+  "motion": {
+    "enabled": true,
+    "duration": 12,
+    "loop": true
+  },
+  "layers": [
+    {
+      "part": "c_twin",
+      "n": 7,
+      "x": 0,
+      "y": 0,
+      "size": 285,
+      "rot": 0,
+      "opacity": 1,
+      "reveal": 1,
+      "flip": false,
+      "sym": "none",
+      "k": 6,
+      "shift": 0,
+      "visible": true,
+      "keys": [
+        {
+          "t": 0,
+          "pose": {
+            "x": 0,
+            "y": 0,
+            "size": 285,
+            "rot": 0,
+            "opacity": 1,
+            "reveal": 1
+          },
+          "ease": "easeInOut"
+        },
+        {
+          "t": 6,
+          "pose": {
+            "x": 0,
+            "y": 0,
+            "size": 304.95000000000005,
+            "rot": 16,
+            "opacity": 1,
+            "reveal": 1
+          },
+          "ease": "easeInOut"
+        },
+        {
+          "t": 12,
+          "pose": {
+            "x": 0,
+            "y": 0,
+            "size": 285,
+            "rot": 0,
+            "opacity": 1,
+            "reveal": 1
+          },
+          "ease": "easeInOut"
+        }
+      ]
+    },
+    {
+      "part": "c_dragon",
+      "n": 5,
+      "x": 0,
+      "y": 0,
+      "size": 135,
+      "rot": 0,
+      "opacity": 1,
+      "reveal": 1,
+      "flip": false,
+      "sym": "none",
+      "k": 6,
+      "shift": 1,
+      "visible": true,
+      "keys": [
+        {
+          "t": 0,
+          "pose": {
+            "x": 0,
+            "y": 0,
+            "size": 135,
+            "rot": 0,
+            "opacity": 1,
+            "reveal": 1
+          },
+          "ease": "easeInOut"
+        },
+        {
+          "t": 6,
+          "pose": {
+            "x": 0,
+            "y": 0,
+            "size": 144.45000000000002,
+            "rot": -20,
+            "opacity": 1,
+            "reveal": 1
+          },
+          "ease": "easeInOut"
+        },
+        {
+          "t": 12,
+          "pose": {
+            "x": 0,
+            "y": 0,
+            "size": 135,
+            "rot": 0,
+            "opacity": 1,
+            "reveal": 1
+          },
+          "ease": "easeInOut"
+        }
+      ]
+    },
+    {
+      "part": "kalpyaprak",
+      "n": 3,
+      "x": 0,
+      "y": -340,
+      "size": 30,
+      "rot": 0,
+      "opacity": 1,
+      "reveal": 1,
+      "flip": false,
+      "sym": "radial",
+      "k": 12,
+      "shift": 2,
+      "visible": true,
+      "keys": [
+        {
+          "t": 0,
+          "pose": {
+            "x": 0,
+            "y": -340,
+            "size": 30,
+            "rot": 0,
+            "opacity": 1,
+            "reveal": 1
+          },
+          "ease": "easeInOut"
+        },
+        {
+          "t": 6,
+          "pose": {
+            "x": 0,
+            "y": -340,
+            "size": 32.1,
+            "rot": 8,
+            "opacity": 1,
+            "reveal": 1
+          },
+          "ease": "easeInOut"
+        },
+        {
+          "t": 12,
+          "pose": {
+            "x": 0,
+            "y": -340,
+            "size": 30,
+            "rot": 0,
+            "opacity": 1,
+            "reveal": 1
+          },
+          "ease": "easeInOut"
+        }
+      ]
+    }
+  ]
+}

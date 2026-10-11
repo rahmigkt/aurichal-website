@@ -1,0 +1,31 @@
+{
+  "v": 1,
+  "title": "WAC 2027",
+  "subtitle": "",
+  "mark": "",
+  "palette": "custom",
+  "custom": {
+    "ground": "#ffffff",
+    "ink": "#171717",
+    "accent": "#171717",
+    "soft": "#171717"
+  },
+  "tex": false,
+  "repeat": "single",
+  "showcase": [],
+  "layers": [
+    {
+      "part": "wac_w",
+      "n": 1,
+      "size": 320,
+      "x": 0,
+      "y": 0,
+      "rot": 0,
+      "flip": false,
+      "sym": "none",
+      "k": 6,
+      "shift": 0,
+      "visible": true
+    }
+  ]
+}
