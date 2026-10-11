@@ -1,4 +1,7 @@
 // NAKIŞ Studio — compose a motif from parts, dye it, weave it, film it.
+import {motionSettings,poseOf,samplePose,normaliseKeys,putKey,trimLine,createHistory,EASINGS} from './studio-motion.js';
+import {motionPanel} from './studio-motion-panel.js';
+import {sceneSVG} from './studio-svg.js';
 import {WAC_PART} from './wac-logo.js';
 import {MOTIFS} from './motifs.js';
 import {RULES,build as buildCurve} from './iter-core.js';
@@ -38,12 +41,15 @@ function norm(p){if(!normCache.has(p)){const sh=shapesOf(p,PARTS[p].counts.at(-1
 let lang=(()=>{try{return localStorage.getItem('nakis-lang')||'tr';}catch{return 'tr';}})();
 const t2=(tr,en)=>lang==='tr'?tr:en;
 let uid=1;
-const newLayer=(part,o={})=>({id:uid++,part,n:PARTS[part].counts.at(-1),x:0,y:0,size:300,rot:0,flip:false,sym:'none',k:6,shift:0,visible:true,...o});
-const defaultProject=()=>({v:1,title:'Untitled Composition',subtitle:'A study in woven geometry',note:'',mark:'Hüseyin Rahmi Göktaş · Global Science Advancement',palette:'turkeyred',custom:{ground:'#7a1230',ink:'#f6e8d2',accent:'#f2c25a',soft:'#eba3b6'},weave:'twill22',cycle:false,repeat:'single',cell:300,pace:2.6,showcase:[],tex:true,layers:[]});
+const newLayer=(part,o={})=>({id:uid++,part,n:PARTS[part].counts.at(-1),x:0,y:0,size:300,rot:0,flip:false,sym:'none',k:6,shift:0,visible:true,opacity:1,reveal:1,keys:[],...o});
+const defaultProject=()=>({v:1,title:'Untitled Composition',subtitle:'A study in woven geometry',note:'',mark:'Hüseyin Rahmi Göktaş · Global Science Advancement',palette:'turkeyred',custom:{ground:'#7a1230',ink:'#f6e8d2',accent:'#f2c25a',soft:'#eba3b6'},weave:'twill22',cycle:false,repeat:'single',cell:300,pace:2.6,showcase:[],tex:true,motion:motionSettings(),layers:[]});
 let proj=defaultProject(),sel=0,tab='parts',mode='edit',now=0,playing=false,rec=null;
+let draftPose=null,selectedEase='easeInOut',onion=false,restoring=false;
+const history=createHistory();
 
 const polar=(r,deg)=>({x:Math.round(r*Math.sin(deg*Math.PI/180)),y:-Math.round(r*Math.cos(deg*Math.PI/180))});
 const PRESETS={
+ motionstudy:()=>({"v": 1, "title": "Moving Geometry", "subtitle": "A layered motion study", "mark": "", "palette": "custom", "custom": {"ground": "#ffffff", "ink": "#171717", "accent": "#626262", "soft": "#9d9d9d"}, "tex": false, "repeat": "single", "showcase": [], "motion": {"enabled": true, "duration": 12, "loop": true}, "layers": [{"part": "c_twin", "n": 7, "x": 0, "y": 0, "size": 285, "rot": 0, "opacity": 1, "reveal": 1, "flip": false, "sym": "none", "k": 6, "shift": 0, "visible": true, "keys": [{"t": 0, "pose": {"x": 0, "y": 0, "size": 285, "rot": 0, "opacity": 1, "reveal": 1}, "ease": "easeInOut"}, {"t": 6, "pose": {"x": 0, "y": 0, "size": 304.95000000000005, "rot": 16, "opacity": 1, "reveal": 1}, "ease": "easeInOut"}, {"t": 12, "pose": {"x": 0, "y": 0, "size": 285, "rot": 0, "opacity": 1, "reveal": 1}, "ease": "easeInOut"}]}, {"part": "c_dragon", "n": 5, "x": 0, "y": 0, "size": 135, "rot": 0, "opacity": 1, "reveal": 1, "flip": false, "sym": "none", "k": 6, "shift": 1, "visible": true, "keys": [{"t": 0, "pose": {"x": 0, "y": 0, "size": 135, "rot": 0, "opacity": 1, "reveal": 1}, "ease": "easeInOut"}, {"t": 6, "pose": {"x": 0, "y": 0, "size": 144.45000000000002, "rot": -20, "opacity": 1, "reveal": 1}, "ease": "easeInOut"}, {"t": 12, "pose": {"x": 0, "y": 0, "size": 135, "rot": 0, "opacity": 1, "reveal": 1}, "ease": "easeInOut"}]}, {"part": "kalpyaprak", "n": 3, "x": 0, "y": -340, "size": 30, "rot": 0, "opacity": 1, "reveal": 1, "flip": false, "sym": "radial", "k": 12, "shift": 2, "visible": true, "keys": [{"t": 0, "pose": {"x": 0, "y": -340, "size": 30, "rot": 0, "opacity": 1, "reveal": 1}, "ease": "easeInOut"}, {"t": 6, "pose": {"x": 0, "y": -340, "size": 32.1, "rot": 8, "opacity": 1, "reveal": 1}, "ease": "easeInOut"}, {"t": 12, "pose": {"x": 0, "y": -340, "size": 30, "rot": 0, "opacity": 1, "reveal": 1}, "ease": "easeInOut"}]}]}),
  wac:()=>({title:'WAC 2027',subtitle:'',mark:'',palette:'custom',custom:{ground:'#ffffff',ink:'#171717',accent:'#171717',soft:'#171717'},tex:false,repeat:'single',showcase:[],layers:[newLayer('wac_w',{size:320})]}),
  medallion:()=>({title:'Medallion of Palmettes',subtitle:'Eight-fold garden: palmette, iris and heart-leaf rings around a damask core',palette:'indigo',weave:'diamond',repeat:'single',layers:[
   newLayer('damask',{n:3,size:95}),
@@ -70,9 +76,9 @@ function symList(l){
  if(l.sym==='radial'||l.sym==='dihedral'){for(let j=0;j<k;j++){const r=R(2*Math.PI*j/k);out.push(r);if(l.sym==='dihedral')out.push(p=>r([-p[0],p[1]]));}return out;}
  return [p=>p];
 }
-function placed(l){
+function placed(l,cache=true){
  const key=JSON.stringify([l.part,l.n,l.size,l.rot,l.flip,l.sym,l.k,l.shift,l.x,l.y]);
- if(pcache.has(key))return pcache.get(key);
+ if(cache&&pcache.has(key))return pcache.get(key);
  const base=shapesOf(l.part,l.n),N=norm(l.part),k=l.size/N.m,r=l.rot*Math.PI/180,cr=Math.cos(r),sr=Math.sin(r),sh=((l.shift%3)+3)%3,mp=t=>{const i=ROLES.indexOf(t);return i<0?t:ROLES[(i+sh)%3];};
  const out=[],syms=symList(l);
  for(const sy of syms)for(const s of base){
@@ -81,7 +87,7 @@ function placed(l){
   out.push({...s,pts,tone:mp(s.tone),tone2:s.tone2&&mp(s.tone2),edge:s.edge&&mp(s.edge),lw:Math.max(1.1,l.size*.0075*(s.thin?.9:s.edge?.55:.95)),y0,y1});
  }
  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const s of out)for(const q of s.pts){x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);y0=Math.min(y0,q[1]);y1=Math.max(y1,q[1]);}
- const res={shapes:out,box:{x0,x1,y0,y1}};if(pcache.size>400)pcache.clear();pcache.set(key,res);return res;
+ const res={shapes:out,box:{x0,x1,y0,y1}};if(cache){if(pcache.size>120)pcache.clear();pcache.set(key,res);}return res;
 }
 const visLayers=()=>proj.layers.filter(l=>l.visible);
 
@@ -89,13 +95,13 @@ const visLayers=()=>proj.layers.filter(l=>l.visible);
 function drawSh(sh,P,ox,oy,sc,alpha,prog){
  const col=P[sh.tone];if(!col||alpha<=0||prog<=0)return;
  ctx.save();ctx.translate(ox,oy);ctx.scale(sc,sc);ctx.globalAlpha=alpha;ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=Math.max(1.1/sc,sh.lw);
- const pts=sh.pts,n=pts.length,upto=sh.fill?n-1:Math.max(1,Math.floor((n-1)*prog));
+ const pts=sh.fill?sh.pts:trimLine(sh.pts,prog),n=pts.length,upto=n-1;
  ctx.beginPath();for(let i=0;i<=upto;i++){const p=pts[i];i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]);}
  if(sh.closed&&prog>=.999)ctx.closePath();
  if(sh.fill){let f=col;if(sh.tone2){const g=ctx.createLinearGradient(0,sh.y0,0,sh.y1);g.addColorStop(0,col);g.addColorStop(1,P[sh.tone2]||col);f=g;}ctx.fillStyle=f;ctx.globalAlpha=alpha*smooth(prog*1.4-.2);ctx.fill();ctx.globalAlpha=alpha;}
  ctx.strokeStyle=sh.tone2?(P[sh.tone2]||col):(P[sh.edge||sh.tone]||col);if(!sh.noStroke)ctx.stroke();ctx.restore();
 }
-const drawAll=(P,ox,oy,sc,alpha)=>{for(const l of visLayers())for(const s of placed(l).shapes)drawSh(s,P,ox,oy,sc,alpha,1);};
+const drawAll=(P,ox,oy,sc,alpha,layers=visLayers())=>{for(const l of layers)for(const s of placed(l,mode!=='motion').shapes)drawSh(s,P,ox,oy,sc,alpha*(l.opacity??1),l.reveal??1);};
 function text(s,x,y,size,col,{font=SERIF,style='italic',align='left',alpha=1,weight='',fit=0}={}){
  if(!s)return;ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=col;ctx.textAlign=align;
  let z=size;ctx.font=`${style} ${weight} ${z}px ${font}`;if(fit){const w=ctx.measureText(s).width;if(w>fit){z=Math.floor(size*fit/w);ctx.font=`${style} ${weight} ${z}px ${font}`;}}
@@ -154,7 +160,7 @@ function stageFrame(P,t){
  else{
   const useTiles=rep&&t>=TL.m,hu=useTiles?inOut((t-TL.m)/3):0;
   if(!useTiles){
-   TL.vis.forEach((l,i)=>{const u=(t-(TL.a+i*pace))/(pace*.85);if(u<=0)return;const shs=placed(l).shapes;shs.forEach((sh,j)=>{const p=smooth((u-(j/shs.length)*.55)/.45);drawSh(sh,P,CX,CY,1,Math.min(1,p*2),p);});});
+   TL.vis.forEach((l,i)=>{const u=(t-(TL.a+i*pace))/(pace*.85);if(u<=0)return;const shs=placed(l).shapes;shs.forEach((sh,j)=>{const p=smooth((u-(j/shs.length)*.55)/.45);drawSh(sh,P,CX,CY,1,Math.min(1,p*2)*(l.opacity??1),p*(l.reveal??1));});});
   }else{
    const w=proj.cell,h=proj.cell*1.25,S=1+(q-1)*hu,hy=CY+(675-CY)*hu,mM=Math.ceil(560/w)+1,nM=Math.ceil(760/h)+1;
    for(let m=-mM;m<=mM;m++)for(let n=-nM;n<=nM;n++){if(!m&&!n)continue;const d=Math.hypot(m,n),u=(t-TL.m-1.2-d*.45)/1.2;if(u<=0)continue;
@@ -204,18 +210,27 @@ function drawEdit(tex){
  ctx.restore();
  if(!proj.layers.length){text(t2('Sağdan bir parça ekleyin ya da hazır örnek yükleyin','Add a part on the right or load an example'),CX,CY,34,'#fff',{align:'center',alpha:.6,style:'normal',font:SANS});}
 }
-function redraw(){if(mode==='film'){frame(now);return;}drawEdit(false);clearTimeout(texTimer);needTex=true;texTimer=setTimeout(()=>{if(mode==='edit'){drawEdit(true);needTex=false;}},450);}
+function redraw(){if(mode==='motion'){drawMotion(now);return;}if(mode==='film'){frame(now);return;}drawEdit(false);clearTimeout(texTimer);needTex=true;texTimer=setTimeout(()=>{if(mode==='edit'){drawEdit(true);needTex=false;}},450);}
 let raf=0;const redrawSoon=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;redraw();});};
 
 // ───────────── persistence ─────────────
 const KEY='nakis-studio-v1';let saveT=0;
-function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(proj));}catch{}},400);}
+function save(){if(!restoring)history.schedule(proj);clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(proj));}catch{}},400);}
 function loadProj(p){
- const d=defaultProject(),o={...d,...p,custom:{...d.custom,...(p.custom||{})}};
- o.layers=(p.layers||[]).filter(l=>PARTS[l.part]).map(l=>{const b=newLayer(l.part);const r={...b,...l,id:uid++};if(!PARTS[r.part].counts.includes(r.n))r.n=PARTS[r.part].counts.at(-1);return r;});
+ if(!p||typeof p!=='object'||Array.isArray(p)||!Array.isArray(p.layers)||p.layers.length>64)throw Error('Invalid project');
+ const d=defaultProject(),o={...d,...p,custom:{...d.custom,...(p.custom||{})},motion:motionSettings(p.motion)};
+ for(const k of ['ground','ink','accent','soft'])if(!/^#[0-9a-f]{6}$/i.test(o.custom[k]))o.custom[k]=d.custom[k];
+ for(const k of ['title','subtitle','note','mark'])o[k]=String(o[k]??'').slice(0,1000);
+ o.layers=p.layers.filter(l=>l&&PARTS[l.part]).map(l=>{
+  const r={...newLayer(l.part),...l,...poseOf(l),id:uid++};
+  if(!PARTS[r.part].counts.includes(r.n))r.n=PARTS[r.part].counts.at(-1);
+  r.sym=['none','mirror','mirror4','radial','dihedral'].includes(r.sym)?r.sym:'none';
+  r.k=clamp(Math.round(+r.k||6),2,24);r.shift=clamp(Math.round(+r.shift||0),0,2);r.visible=l.visible!==false;r.flip=l.flip===true;
+  r.keys=normaliseKeys(l.keys,o.motion.duration,r);return r;
+ });
  if(!HISTORIC[o.palette]&&o.palette!=='custom')o.palette='turkeyred';if(!WEAVES[o.weave])o.weave='twill22';if(!['single','halfdrop','grid'].includes(o.repeat))o.repeat='single';
- o.showcase=(o.showcase||[]).filter(k=>HISTORIC[k]);o.pace=clamp(+o.pace||2.6,1,8);o.cell=clamp(+o.cell||300,160,520);
- proj=o;sel=Math.min(sel,Math.max(0,o.layers.length-1));
+ o.showcase=(Array.isArray(o.showcase)?o.showcase:[]).filter(k=>HISTORIC[k]).slice(0,20);o.pace=clamp(+o.pace||2.6,1,8);o.cell=clamp(+o.cell||300,160,520);
+ proj=o;draftPose=null;sel=Math.min(sel,Math.max(0,o.layers.length-1));
 }
 function changed(structure){mode='edit';playing=false;rebuild();updateDerived();if(structure)renderPanel();redrawSoon();save();}
 
@@ -233,7 +248,7 @@ function tabParts(){
  if(l){const p=PARTS[l.part];
   h+=`<h3>${t2('Seçili parça','Selected part')}: ${p.title}</h3><div class="hint">${p.blurb}</div>`;
   h+=`<div class="ctl2"><label>${t2('Sayı (n)','Count (n)')}</label><select data-k="n">${p.counts.map(c=>`<option ${c===l.n?'selected':''}>${c}</option>`).join('')}</select></div>`;
-  h+=rng(t2('Boyut','Size'),'size',30,900,1,l.size)+rng('X','x',-540,540,1,l.x)+rng('Y','y',-600,600,1,l.y)+rng(t2('Dönüş °','Rotate °'),'rot',-180,180,.5,l.rot);
+  h+=rng(t2('Görünürlük','Opacity'),'opacity',0,1,.01,l.opacity)+rng(t2('Boyut','Size'),'size',30,900,1,l.size)+rng('X','x',-540,540,1,l.x)+rng('Y','y',-600,600,1,l.y)+rng(t2('Dönüş °','Rotate °'),'rot',-180,180,.5,l.rot);
   h+=`<div class="ctl2"><label>${t2('Aynalı','Flip')}</label><label><input type="checkbox" data-k="flip" ${l.flip?'checked':''}> ${t2('yatay çevir','flip horizontally')}</label></div>`;
   h+=`<div class="ctl2"><label>${t2('Simetri','Symmetry')}</label><select data-k="sym">${[['none',t2('Yok','None')],['mirror',t2('Ayna (sol–sağ)','Mirror (left–right)')],['mirror4',t2('Dörtlü ayna','Fourfold mirror')],['radial',t2('Dairesel dönüş','Radial rotation')],['dihedral',t2('Dönüş + ayna','Rotation + mirror')]].map(([v,n])=>`<option value="${v}" ${l.sym===v?'selected':''}>${n}</option>`).join('')}</select></div>`;
   if(l.sym==='radial'||l.sym==='dihedral')h+=rng(t2('Kopya sayısı','Copies'),'k',2,24,1,l.k);
@@ -270,52 +285,130 @@ function tabOut(){
  return `<h3>${t2('Film','Film')}</h3>
  <div class="ctl"><label>${t2('Parça başına sn','Seconds per part')}</label><input type="range" data-p="pace" min="1" max="8" step=".1" value="${proj.pace}"><output>${proj.pace}</output></div>
  <div class="hint">${t2('Toplam süre','Total length')}: <b id="dur"></b></div>
- <div class="btns"><button class="pri" data-act="play">${t2('Filmi oynat','Play film')}</button><button data-act="cloth">${t2('Bitmiş kumaşı göster','Show finished cloth')}</button><button data-act="rec">${t2('● WebM kaydet','● Record WebM')}</button><button data-act="png">PNG</button></div>
+ <div class="btns"><button class="pri" data-act="play">${t2('Filmi oynat','Play film')}</button><button data-act="cloth">${t2('Bitmiş kumaşı göster','Show finished cloth')}</button><button data-act="rec">${t2('● WebM kaydet','● Record WebM')}</button><button data-act="png">PNG</button><button data-act="svg">SVG</button></div>
+ <label class="hint"><input id="svg-opt" type="checkbox"> ${t2('SVG açık çizgilerini hafiflet (isteğe bağlı)','Simplify open SVG strokes (optional)')}</label><div class="hint">${t2('SVG, tek kompozisyonun vektör geometrisini içerir; kumaş dokusu ve film yazıları PNG / videoda kalır.','SVG contains one composition’s vector geometry; cloth texture and film captions remain in PNG / video.')}</div>
  <div class="hint">${t2('WebM kaydı gerçek zamanlıdır; bilgisayar yavaşsa kare atlayabilir. Sergi kalitesinde mp4 için proje dosyasını kaydedip bana gönderin.','WebM recording runs in real time and may drop frames on a slow computer. For exhibition-grade mp4, save the project file and send it to me.')}</div>
  <h3>${t2('Proje','Project')}</h3><div class="btns"><button data-act="savep">${t2('Projeyi kaydet (.json)','Save project (.json)')}</button><button data-act="loadp">${t2('Proje aç','Open project')}</button><button data-act="newp">${t2('Yeni','New')}</button></div><input type="file" id="file" accept=".json,application/json" hidden>`;
 }
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-const TABS=[['parts','Parçalar','Parts'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['out','Çıktı','Output']];
+const TABS=[['parts','Parçalar','Parts'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['motion','Hareket','Motion'],['out','Çıktı','Output']];
 function renderPanel(){
  $('tabs').innerHTML=TABS.map(([k,a,b])=>`<button data-act="tab" data-key="${k}" class="${tab===k?'on':''}">${t2(a,b)}</button>`).join('');
- $('panel').innerHTML={parts:tabParts,colour:tabColour,weave:tabWeave,text:tabText,out:tabOut}[tab]();
+ $('panel').innerHTML={parts:tabParts,colour:tabColour,weave:tabWeave,text:tabText,motion:()=>motionPanel(proj,sel,Math.min(now,proj.motion.duration),draftPose,selectedEase,onion,PARTS,t2),out:tabOut}[tab]();
  $('pp').textContent=playing?'⏸':t2('▶ Film','▶ Film');$('sub').textContent=t2('— parçalardan motif, motiften kumaş','— parts into motif, motif into cloth');
  updateDerived();
 }
-function updateDerived(){const d=$('dur');if(d)d.textContent=`${Math.floor(TL.total/60)}:${String(Math.round(TL.total%60)).padStart(2,'0')}`;const e=$('desc');if(e)e.textContent=describe();}
+function updateDerived(){const d=$('dur'),total=sceneTotal();if(d)d.textContent=`${Math.floor(total/60)}:${String(Math.round(total%60)).padStart(2,'0')}`;const e=$('desc');if(e)e.textContent=describe();}
 function toast(s){const e=$('toast');e.textContent=s;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),2200);}
 function download(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),30000);}
 const slug=()=>proj.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'composition';
 
-// ───────────── transport ─────────────
-function showFilm(t){mode='film';now=clamp(t,0,TL.total);frame(now);$('seek').value=Math.round(now/TL.total*1000);const s=Math.floor(now);$('tm').textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
+// ───────────── motion and transport ─────────────
+const sceneTotal=()=>proj.motion.enabled?proj.motion.duration:TL.total;
+function effectiveLayer(l,t=now){return {...l,...(mode==='motion'&&l===proj.layers[sel]&&draftPose?draftPose:samplePose(l,t,proj.motion.duration))};}
+function motionLayers(t=now){return visLayers().map(l=>effectiveLayer(l,t));}
+function drawMotion(t,ghosts=true){
+ ctx=mctx;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.fillStyle=ST[1].ground;ctx.fillRect(0,0,W,H);
+ const P={...ST[1],wk:proj.tex?ST[1].wk:null};
+ if(onion&&ghosts&&!playing){const l=proj.layers[sel];if(l){const keys=l.keys||[],prev=keys.filter(k=>k.t<t).at(-1),next=keys.find(k=>k.t>t);for(const k of [prev,next])if(k)drawAll(P,CX,CY,1,.12,[{...l,...k.pose}]);}}
+ drawAll(P,CX,CY,1,1,motionLayers(t));if(proj.tex)brocadeOver(ctx,W,H,P);
+}
+function timeUI(total){
+ $('seek').value=Math.round(now/total*1000);$('seek').setAttribute?.('aria-label',t2('Zaman çizelgesi','Timeline'));
+ $('tm').textContent=now.toFixed(1)+' s';
+ const input=$('motion-time');if(input&&document.activeElement!==input)input.value=now.toFixed(2);
+ document.querySelectorAll('.playhead').forEach(e=>e.style.left=Math.min(100,now/proj.motion.duration*100)+'%');
+}
+function showFilm(t){mode='film';now=clamp(t,0,TL.total);frame(now);timeUI(TL.total);}
+function showMotion(t){mode='motion';now=clamp(t,0,proj.motion.duration);drawMotion(now);timeUI(proj.motion.duration);}
+function showScene(t){proj.motion.enabled?showMotion(t):showFilm(t);}
+function cleanFrame(){
+ if(mode==='motion'){drawMotion(now,false);return;}
+ if(mode==='film'){frame(now);return;}
+ ctx=mctx;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.fillStyle=ST[1].ground;ctx.fillRect(0,0,W,H);drawAll(ST[1],CX,CY,1,1);if(proj.tex)brocadeOver(ctx,W,H,ST[1]);
+}
+function editMotion(){draftPose=null;playing=false;mode='motion';now=clamp(now,0,proj.motion.duration);tab='motion';renderPanel();showMotion(now);}
+function motionChanged(){playing=false;mode='motion';rebuild();save();renderPanel();showMotion(now);}
+function restoreHistory(direction){
+ const p=history[direction]();if(!p)return;
+ restoring=true;loadProj(p);changed(true);restoring=false;
+ if(proj.motion.enabled)editMotion();
+}
+function captureKey(){
+ history.flush();
+ const l=proj.layers[sel];if(!l)return;
+ try{l.keys=putKey(l,now,draftPose||samplePose(l,now,proj.motion.duration),selectedEase,proj.motion.duration);}catch{toast(t2('Katman başına en fazla 128 anahtar kare','Maximum 128 keyframes per layer'));return;}draftPose=null;motionChanged();
+}
 let last=performance.now();
-function loop(ts){const dt=Math.min(.1,(ts-last)/1000);last=ts;if(playing&&mode==='film'){if(now>=TL.total){playing=false;$('pp').textContent=t2('▶ Film','▶ Film');if(rec){rec.stop();rec=null;}}else showFilm(now+dt);}requestAnimationFrame(loop);}
-function play(){if(!proj.layers.length){toast(t2('Önce parça ekleyin','Add a part first'));return;}if(mode!=='film'||now>=TL.total)now=0;mode='film';playing=!playing;$('pp').textContent=playing?'⏸':t2('▶ Film','▶ Film');if(!playing)showFilm(now);}
-function record(){
- if(!window.MediaRecorder){toast(t2('Bu tarayıcı kayıt desteklemiyor','Recording is not supported in this browser'));return;}
+function loop(ts){
+ const dt=Math.max(0,(ts-last)/1000);last=ts;
+ if(playing&&(mode==='film'||mode==='motion')){
+  const total=mode==='motion'?proj.motion.duration:TL.total,t=now+dt;
+  if(t>=total){
+   if(mode==='motion'&&proj.motion.loop&&!rec)showMotion(t%total);
+   else{mode==='motion'?showMotion(total):showFilm(total);playing=false;$('pp').textContent=t2('▶ Film','▶ Film');if(rec)stopRecording();}
+  }else mode==='motion'?showMotion(t):showFilm(t);
+ }
+ requestAnimationFrame(loop);
+}
+function play(){
+ if(rec)return;
  if(!proj.layers.length){toast(t2('Önce parça ekleyin','Add a part first'));return;}
- const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));const ch=[];
- const r=new MediaRecorder(cv.captureStream(30),{mimeType:mime,videoBitsPerSecond:12e6});r.ondataavailable=e=>e.data.size&&ch.push(e.data);
- r.onstop=()=>download(new Blob(ch,{type:'video/webm'}),`nakis-${slug()}.webm`);rec=r;r.start(250);now=0;mode='film';showFilm(0);playing=true;$('pp').textContent='⏸';toast(t2('Kayıt başladı — sekmeyi açık tutun','Recording — keep this tab open'));
+ const target=proj.motion.enabled?'motion':'film',total=sceneTotal();
+ if(mode!==target||now>=total)now=0;
+ draftPose=null;playing=!playing;last=performance.now();showScene(now);$('pp').textContent=playing?'⏸':t2('▶ Film','▶ Film');
+}
+function lockRecording(lock){
+ document.querySelectorAll('#panel button,#panel input,#panel select,#panel textarea,#tabs button,#lang,#undo,#redo,#seek,#pp').forEach(e=>e.disabled=lock);
+ $('rec-stop').hidden=!lock;
+}
+function stopRecording(){if(rec&&rec.state!=='inactive')rec.stop();playing=false;}
+function record(){
+ if(rec)return;
+ if(!window.MediaRecorder||!cv.captureStream){toast(t2('Bu tarayıcı kayıt desteklemiyor','Recording is not supported in this browser'));return;}
+ if(!proj.layers.length){toast(t2('Önce parça ekleyin','Add a part first'));return;}
+ const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'].find(m=>MediaRecorder.isTypeSupported(m));
+ if(!mime){toast(t2('Uyumlu video biçimi bulunamadı','No supported video format'));return;}
+ let stream;
+ try{
+  draftPose=null;onion=false;showScene(0);stream=cv.captureStream(30);const ch=[],name=slug();
+  const r=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:12e6});
+  r.ondataavailable=e=>e.data.size&&ch.push(e.data);
+  r.onstop=()=>{stream.getTracks().forEach(t=>t.stop());rec=null;playing=false;lockRecording(false);renderPanel();$('pp').textContent=t2('▶ Film','▶ Film');if(ch.length)download(new Blob(ch,{type:r.mimeType||mime}),`nakis-${name}.${mime.startsWith('video/mp4')?'mp4':'webm'}`);};
+  r.onerror=()=>{stopRecording();toast(t2('Kayıt hatası; mevcut bölüm kaydediliyor','Recording error; saving captured section'));};
+  rec=r;r.start(250);playing=true;last=performance.now();lockRecording(true);$('pp').textContent='⏸';toast(t2('Kayıt başladı — sekmeyi açık tutun','Recording — keep this tab open'));
+ }catch{if(stream)stream.getTracks().forEach(t=>t.stop());rec=null;playing=false;lockRecording(false);toast(t2('Kayıt başlatılamadı','Could not start recording'));}
 }
 
 // ───────────── events ─────────────
 const move=(i,d)=>{const j=i+d;if(j<0||j>=proj.layers.length)return;[proj.layers[i],proj.layers[j]]=[proj.layers[j],proj.layers[i]];sel=j;};
 document.addEventListener('click',e=>{
  const el=e.target.closest('[data-act]');if(!el||el.tagName==='SELECT'||el.type==='checkbox')return;const a=el.dataset.act,i=+el.dataset.i,key=el.dataset.key;
- if(a==='tab'){tab=key;renderPanel();return;}
+ if(rec){if(a==='rec-stop')stopRecording();return;}
+ if(a==='undo'){restoreHistory('undo');return;}if(a==='redo'){restoreHistory('redo');return;}
+ history.flush();
+ if(a==='tab'){tab=key;if(tab==='motion'){editMotion();return;}draftPose=null;renderPanel();return;}
+ if(a==='motion-edit'){draftPose=null;mode='edit';playing=false;tab='parts';renderPanel();redraw();return;}
+ if(a==='motion-start'){draftPose=null;playing=false;showMotion(0);renderPanel();return;}
+ if(a==='motion-play'){if(!proj.motion.enabled){proj.motion.enabled=true;save();}play();return;}
+ if(a==='motion-layer'){sel=i;draftPose=null;editMotion();return;}
+ if(a==='motion-key'){sel=i;draftPose=null;const k=proj.layers[i].keys[+el.dataset.keyIndex];if(k){selectedEase=k.ease;showMotion(k.t);renderPanel();}return;}
+ if(a==='motion-capture'){captureKey();return;}
+ if(a==='motion-delete'){const l=proj.layers[sel];if(l){l.keys=l.keys.filter(k=>Math.abs(k.t-now)>.001);draftPose=null;motionChanged();}return;}
+ if(a==='motion-discard'){draftPose=null;editMotion();return;}
+ if(a==='motion-example'){const l=proj.layers[sel];if(!l)return;const b=poseOf(l),d=proj.motion.duration;l.keys=[{t:0,pose:b,ease:'easeInOut'},{t:d/2,pose:poseOf({...b,y:b.y-55,rot:b.rot+5,size:b.size*1.04}),ease:'easeInOut'},{t:d,pose:b,ease:'easeInOut'}];proj.motion.enabled=true;draftPose=null;now=0;motionChanged();return;}
  if(a==='add'){const l=newLayer(el.dataset.part,{size:proj.layers.length?220:320});proj.layers.push(l);sel=proj.layers.length-1;changed(true);return;}
  if(a==='sel'){sel=i;mode='edit';renderPanel();redrawSoon();return;}
  if(a==='up'){move(i,-1);changed(true);return;}if(a==='dn'){move(i,1);changed(true);return;}
- if(a==='dup'){const c={...proj.layers[i],id:uid++,x:proj.layers[i].x+30,y:proj.layers[i].y+30};proj.layers.splice(i+1,0,c);sel=i+1;changed(true);return;}
+ if(a==='dup'){const c={...JSON.parse(JSON.stringify(proj.layers[i])),id:uid++,x:proj.layers[i].x+30,y:proj.layers[i].y+30};proj.layers.splice(i+1,0,c);sel=i+1;changed(true);return;}
  if(a==='del'){proj.layers.splice(i,1);sel=Math.max(0,Math.min(sel,proj.layers.length-1));changed(true);return;}
  if(a==='pal'){if(e.target.closest('label,input'))return;proj.palette=key;changed(true);return;}
  if(a==='weave'){proj.weave=key;changed(true);return;}
  if(a==='play'){play();return;}
  if(a==='cloth'){if(!proj.layers.length)return;playing=false;showFilm(TL.c+.5);$('pp').textContent=t2('▶ Film','▶ Film');return;}
  if(a==='rec'){record();return;}
- if(a==='png'){cv.toBlob(b=>b&&download(b,`nakis-${slug()}.png`));return;}
+ if(a==='png'){cleanFrame();cv.toBlob(b=>{if(b)download(b,`nakis-${slug()}.png`);redraw();});return;}
+ if(a==='svg'){const layers=mode==='motion'?motionLayers():visLayers(),result=sceneSVG(layers,ST[1],placed,{optimise:$('svg-opt')?.checked});download(new Blob([result.svg],{type:'image/svg+xml'}),`nakis-${slug()}.svg`);toast(`${result.after} / ${result.before} ${t2('nokta','points')}`);return;}
  if(a==='savep'){download(new Blob([JSON.stringify(proj,null,1)],{type:'application/json'}),`nakis-${slug()}.json`);return;}
  if(a==='loadp'){$('file').click();return;}
  if(a==='newp'){proj=defaultProject();sel=0;changed(true);return;}
@@ -324,6 +417,15 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('input',e=>{
  const el=e.target,k=el.dataset.k,p=el.dataset.p,a=el.dataset.act,c=el.dataset.c;
+ if(rec)return;
+ if(el.dataset.pose){const l=proj.layers[sel];if(!l)return;draftPose=poseOf({...draftPose||samplePose(l,now,proj.motion.duration),[el.dataset.pose]:+el.value});el.parentNode.querySelector('output').textContent=el.value;mode='motion';playing=false;drawMotion(now);const msg=$('motion-draft');if(msg)msg.textContent=t2('Poz henüz kaydedilmedi. Anahtar kare ekle düğmesine basın.','Pose not saved yet. Press Add keyframe.');return;}
+ if(el.dataset.motion){const k=el.dataset.motion;
+  if(k==='duration')return;
+  if(k==='time'){draftPose=null;playing=false;showMotion(+el.value);return;}
+  if(k==='ease'){selectedEase=Object.hasOwn(EASINGS,el.value)?el.value:'easeInOut';renderPanel();return;}
+  if(k==='onion'){onion=el.checked;drawMotion(now);return;}
+  proj.motion=motionSettings({...proj.motion,[k]:el.type==='checkbox'?el.checked:+el.value});now=Math.min(now,proj.motion.duration);for(const l of proj.layers)l.keys=normaliseKeys(l.keys,proj.motion.duration,poseOf(l));draftPose=null;motionChanged();return;
+ }
  if(k){const l=proj.layers[sel];if(!l)return;l[k]=el.type==='checkbox'?el.checked:(k==='sym'?el.value:+el.value);const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;
   changed(k==='sym');if(k==='n'||k==='shift'){/* list label */ const nm=document.querySelector('#layers li.on .nm');if(nm)nm.textContent=`${sel+1}. ${PARTS[l.part].title} · n=${l.n}${l.sym!=='none'?' · '+l.sym:''}`;}return;}
  if(p){proj[p]=el.type==='checkbox'?el.checked:(el.type==='range'?+el.value:el.value);const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;changed(p==='repeat');return;}
@@ -335,24 +437,42 @@ document.addEventListener('input',e=>{
 function loadFrom(p){const keep=proj;loadProj(p);const r=proj;proj=keep;return r;}
 $('lang').onclick=()=>{lang=lang==='tr'?'en':'tr';try{localStorage.setItem('nakis-lang',lang);}catch{}$('lang').textContent=lang==='tr'?'EN':'TR';renderPanel();redrawSoon();};
 $('pp').onclick=play;
-$('seek').oninput=e=>{playing=false;showFilm(e.target.value/1000*TL.total);};
-document.addEventListener('change',e=>{if(e.target.id==='file'){const f=e.target.files[0];if(!f)return;f.text().then(s=>{try{loadProj(JSON.parse(s));sel=0;changed(true);toast(t2('Proje yüklendi','Project loaded'));}catch{toast(t2('Dosya okunamadı','Could not read file'));}});e.target.value='';}});
+$('seek').oninput=e=>{if(rec)return;draftPose=null;playing=false;const motion=mode==='motion'||proj.motion.enabled;(motion?showMotion:showFilm)(e.target.value/1000*(motion?proj.motion.duration:TL.total));if(tab==='motion')renderPanel();};
+document.addEventListener('change',e=>{
+ if(rec)return;
+ if(e.target.dataset.motion==='duration'){
+  const old=proj.motion.duration;proj.motion=motionSettings({...proj.motion,duration:+e.target.value});
+  for(const l of proj.layers)l.keys=normaliseKeys(l.keys.map(k=>({...k,t:k.t*proj.motion.duration/old})),proj.motion.duration,poseOf(l));
+  now=Math.min(now*proj.motion.duration/old,proj.motion.duration);draftPose=null;motionChanged();return;
+ }
+ if(e.target.id==='file'){const f=e.target.files[0];if(!f)return;if(f.size>2e6){toast(t2('Proje dosyası fazla büyük','Project file too large'));e.target.value='';return;}f.text().then(s=>{try{loadProj(JSON.parse(s));sel=0;changed(true);if(proj.motion.enabled)editMotion();toast(t2('Proje yüklendi','Project loaded'));}catch{toast(t2('Dosya okunamadı','Could not read file'));}});e.target.value='';}
+});
 // canvas: select, drag, wheel
 let drag=null;
 const pos=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width*W-CX,(e.clientY-r.top)/r.height*H-CY];};
-cv.addEventListener('pointerdown',e=>{if(mode!=='edit')return;const [x,y]=pos(e),hit=i=>{const l=proj.layers[i];if(!l||!l.visible)return false;const b=placed(l).box;return x>=b.x0&&x<=b.x1&&y>=b.y0&&y<=b.y1;};
+cv.addEventListener('pointerdown',e=>{if(rec||playing||!['edit','motion'].includes(mode))return;const [x,y]=pos(e),hit=i=>{const l=proj.layers[i];if(!l||!l.visible)return false;const b=placed(mode==='motion'?effectiveLayer(l):l).box;return x>=b.x0&&x<=b.x1&&y>=b.y0&&y<=b.y1;};
  let h=hit(sel)?sel:-1;if(h<0)for(let i=proj.layers.length-1;i>=0;i--)if(hit(i)){h=i;break;}
- if(h<0)return;if(h!==sel){sel=h;renderPanel();}drag={x,y,lx:proj.layers[sel].x,ly:proj.layers[sel].y};cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
-cv.addEventListener('pointermove',e=>{if(!drag)return;const [x,y]=pos(e),l=proj.layers[sel];l.x=Math.round(drag.lx+x-drag.x);l.y=Math.round(drag.ly+y-drag.y);syncXY(l);rebuild();redrawSoon();});
-cv.addEventListener('pointerup',()=>{if(drag){drag=null;cv.style.cursor='grab';save();}});
+ if(h<0)return;if(h!==sel){sel=h;renderPanel();}const pose=mode==='motion'?effectiveLayer(proj.layers[sel]):proj.layers[sel];if(mode==='motion')draftPose=poseOf(pose);drag={x,y,lx:pose.x,ly:pose.y,motion:mode==='motion'};cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const [x,y]=pos(e),l=proj.layers[sel];if(drag.motion){draftPose=poseOf({...draftPose,x:drag.lx+x-drag.x,y:drag.ly+y-drag.y});drawMotion(now);for(const k of ['x','y']){const input=document.querySelector(`[data-pose=${k}]`);if(input){input.value=draftPose[k];input.parentNode.querySelector('output').textContent=Math.round(draftPose[k]);}}}else{l.x=Math.round(drag.lx+x-drag.x);l.y=Math.round(drag.ly+y-drag.y);syncXY(l);rebuild();redrawSoon();}});
+const endDrag=()=>{if(drag){const motion=drag.motion;drag=null;cv.style.cursor='grab';if(!motion)save();else renderPanel();}};cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
 cv.addEventListener('wheel',e=>{if(mode!=='edit'||!proj.layers[sel])return;e.preventDefault();const l=proj.layers[sel];l.size=clamp(Math.round(l.size*Math.pow(1.0015,-e.deltaY)),30,900);const s=document.querySelector('[data-k=size]');if(s){s.value=l.size;s.parentNode.querySelector('output').textContent=l.size;}rebuild();redrawSoon();save();},{passive:false});
 function syncXY(l){for(const k of ['x','y']){const s=document.querySelector(`[data-k=${k}]`);if(s){s.value=l[k];s.parentNode.querySelector('output').textContent=l[k];}}}
 
+
+document.addEventListener('keydown',e=>{
+ if(rec||e.target?.closest?.('input,textarea,select,[contenteditable]'))return;
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();restoreHistory(e.shiftKey?'redo':'undo');}
+ else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();restoreHistory('redo');}
+ else if(e.code==='Space'){e.preventDefault();play();}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(rec){stopRecording();toast(t2('Sekme gizlendi; mevcut kayıt sonlandırıldı','Tab hidden; captured section saved'));}playing=false;$('pp').textContent=t2('▶ Film','▶ Film');}});
+const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');reducedMotion?.addEventListener?.('change',e=>{if(e.matches&&!rec){playing=false;$('pp').textContent=t2('▶ Film','▶ Film');}});
+
 // ───────────── boot ─────────────
-window.renderAt=t=>{playing=false;showFilm(t);return TL.total;};
-window.filmTotal=()=>TL.total;
-window.loadProject=p=>{loadProj(p);sel=0;changed(true);return TL.total;};
-window.studio={get project(){return proj;},presets:PRESETS,parts:PARTS,load:name=>{loadProj(PRESETS[name]());sel=0;changed(true);},edit:()=>{mode='edit';playing=false;drawEdit(true);}};
+window.renderAt=t=>{draftPose=null;playing=false;showScene(t);return sceneTotal();};
+window.filmTotal=sceneTotal;
+window.loadProject=p=>{history.flush();loadProj(p);sel=0;changed(true);if(proj.motion.enabled)editMotion();return sceneTotal();};
+window.studio={get project(){return proj;},presets:PRESETS,parts:PARTS,motion:()=>editMotion(),captureKey,undo:()=>restoreHistory('undo'),redo:()=>restoreHistory('redo'),load:name=>{loadProj(PRESETS[name]());sel=0;changed(true);},edit:()=>{mode='edit';playing=false;drawEdit(true);}};
 (async()=>{
  $('lang').textContent=lang==='tr'?'EN':'TR';
  const q=new URLSearchParams(location.search);let ok=false;
@@ -360,7 +480,7 @@ window.studio={get project(){return proj;},presets:PRESETS,parts:PARTS,load:name
  if(q.get('preset')&&PRESETS[q.get('preset')]){loadProj(PRESETS[q.get('preset')]());ok=true;}
  if(q.get('p')){try{loadProj(await (await fetch(q.get('p'))).json());ok=true;}catch{}}
  if(!ok)loadProj(PRESETS.medallion());
- rebuild();renderPanel();
- if(q.get('t')!==null&&q.get('t')!==''&&q.get('t')!==undefined&&q.has('t'))showFilm(+q.get('t'));else drawEdit(false),redraw();
+ rebuild();history.reset(proj);renderPanel();
+ if(q.get('t')!==null&&q.get('t')!==''&&q.get('t')!==undefined&&q.has('t'))showScene(+q.get('t'));else if(proj.motion.enabled)editMotion();else drawEdit(false),redraw();
  requestAnimationFrame(ts=>{last=ts;loop(ts);});
 })();
