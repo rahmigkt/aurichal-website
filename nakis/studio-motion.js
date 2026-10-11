@@ -1,7 +1,7 @@
 import BezierEasing from './vendor/bezier-easing.js';
 
 const limit=(v,a,b,d)=>Number.isFinite(+v)?Math.min(b,Math.max(a,+v)):d;
-export const CHANNELS={x:[-2000,2000,0],y:[-2000,2000,0],size:[30,900,300],rot:[-1080,1080,0],opacity:[0,1,1],reveal:[0,1,1]};
+export const CHANNELS={x:[-2000,2000,0],y:[-2000,2000,0],size:[30,900,300],rot:[-1080,1080,0],opacity:[0,1,1],reveal:[0,1,1],formation:[0,1,1],fold:[0,1,0],growth:[0,1,1]};
 export const EASINGS={linear:t=>t,ease:BezierEasing(.25,.1,.25,1),easeIn:BezierEasing(.42,0,1,1),easeOut:BezierEasing(0,0,.58,1),easeInOut:BezierEasing(.42,0,.58,1),hold:t=>t<1?0:1};
 export function poseOf(value={}){value=value||{};return Object.fromEntries(Object.entries(CHANNELS).map(([k,[a,b,d]])=>[k,limit(value[k],a,b,d)]));}
 export function motionSettings(value={}){value=value||{};return {enabled:value.enabled===true,duration:limit(value.duration,2,60,12),loop:value.loop===true};}
