@@ -1,5 +1,6 @@
 import simplify from './vendor/simplify.js';
 import {trimLine} from './studio-motion.js';
+import {shadeColour} from './studio-geometry.js';
 const xml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 const num=n=>Number(n.toFixed(6));
 /** Export vector geometry only. Cloth shading / film captions are raster effects. */
@@ -16,7 +17,7 @@ export function sceneSVG(layers,palette,placed,{width=1080,height=1350,cx=540,cy
    after+=pts.length;
    if(!pts.length)continue;
    const d=pts.map(([x,y],i)=>`${i?'L':'M'}${num(x+cx)} ${num(y+cy)}`).join(' ')+(sh.closed?' Z':'');
-   let fill=sh.fill?palette[sh.tone]:'none';
+   let fill=sh.fill?shadeColour(palette[sh.tone],sh.faceShade??1):'none';
    if(sh.fill&&sh.tone2){const id='g'+count;defs+=`<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${cx}" x2="${cx}" y1="${num(sh.y0+cy)}" y2="${num(sh.y1+cy)}"><stop stop-color="${xml(fill)}"/><stop offset="1" stop-color="${xml(palette[sh.tone2]||fill)}"/></linearGradient>`;fill=`url(#${id})`;}
    const stroke=sh.noStroke?'none':palette[sh.tone2||sh.edge||sh.tone];
    const u=Math.max(0,Math.min(1,reveal*1.4-.2)),alpha=sh.fill?u*u*(3-2*u):1;
