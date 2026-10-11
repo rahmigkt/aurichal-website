@@ -1,7 +1,7 @@
 import {CHANNELS,EASINGS,normaliseKeys,poseOf,samplePose} from './studio-motion.js';
 export function motionPanel(proj,selected,time,draft,ease,onion,parts,t){
  const m=proj.motion,l=proj.layers[selected],pose=l?(draft||samplePose(l,time,m.duration)):poseOf();
- const labels={x:'X',y:'Y',size:t('Boyut','Size'),rot:t('Dönüş °','Rotation °'),opacity:t('Görünürlük','Opacity'),reveal:t('Çizim ilerlemesi','Draw progress')};
+ const labels={x:'X',y:'Y',size:t('Boyut','Size'),rot:t('Dönüş °','Rotation °'),opacity:t('Görünürlük','Opacity'),reveal:t('Çizim ilerlemesi','Draw progress'),formation:t('Üçgen → şekil','Triangle → shape'),fold:t('Katlanma','Fold amount'),growth:t('Zincir büyümesi','Chain growth')};
  const names={linear:t('Doğrusal','Linear'),ease:t('Akıcı','Ease'),easeIn:t('Hızlanarak','Ease in'),easeOut:t('Yavaşlayarak','Ease out'),easeInOut:t('Yumuşak giriş / çıkış','Ease in/out'),hold:t('Bekle, sonra geç','Hold')};
  let h=`<h3>${t('Katman animasyonu','Layer animation')}</h3><label><input type="checkbox" data-motion="enabled" ${m.enabled?'checked':''}> ${t('Çıktıda bu zaman çizelgesini kullan','Use this timeline for output')}</label>
  <div class="ctl2"><label for="motion-duration">${t('Süre (sn)','Duration (s)')}</label><input id="motion-duration" type="number" min="2" max="60" step=".1" data-motion="duration" value="${m.duration}"></div>
@@ -17,7 +17,10 @@ export function motionPanel(proj,selected,time,draft,ease,onion,parts,t){
  h+='</div>';
  if(!l)return h+`<div class="hint">${t('Parçalar sekmesinden bir katman ekleyin.','Add a layer from Parts.')}</div>`;
  h+=`<h3>${parts[l.part].title} · ${t('Poz','Pose')}</h3>`;
- for(const [k,[min,max]] of Object.entries(CHANNELS))h+=`<div class="ctl"><label for="pose-${k}">${labels[k]}</label><input id="pose-${k}" type="range" data-pose="${k}" min="${min}" max="${max}" step="${k==='opacity'||k==='reveal'?'.01':'.5'}" value="${pose[k]}"><output>${Number(pose[k].toFixed(2))}</output></div>`;
+ for(const [k,[min,max]] of Object.entries(CHANNELS)){
+  if(['formation','fold','growth'].includes(k)&&!l.experimental)continue;
+  h+=`<div class="ctl"><label for="pose-${k}">${labels[k]}</label><input id="pose-${k}" type="range" data-pose="${k}" min="${min}" max="${max}" step="${max===1?'.01':'.5'}" value="${pose[k]}"><output>${Number(pose[k].toFixed(2))}</output></div>`;
+ }
  const curve=Array.from({length:41},(_,i)=>`${i?'L':'M'}${i*3} ${60-60*EASINGS[ease](i/40)}`).join(' ');
  h+=`<div class="ctl2"><label for="motion-ease">${t('Geçiş','Transition')}</label><select id="motion-ease" data-motion="ease">${Object.entries(names).map(([k,n])=>`<option value="${k}" ${k===ease?'selected':''}>${n}</option>`).join('')}</select></div>
  <svg class="ease-plot" viewBox="-4 -4 128 68" role="img" aria-label="${t('Hareket eğrisi','Easing curve')}"><path d="M0 0V60H120" fill="none" stroke="currentColor" opacity=".25"/><path d="${curve}" fill="none" stroke="currentColor" stroke-width="2"/></svg>
