@@ -1,4 +1,5 @@
 // NAKIŞ Studio — compose a motif from parts, dye it, weave it, film it.
+import {WAC_PART} from './wac-logo.js';
 import {MOTIFS} from './motifs.js';
 import {RULES,build as buildCurve} from './iter-core.js';
 import {L} from './prim.js';
@@ -27,6 +28,7 @@ const CUR={
 for(const [k,c] of Object.entries(CUR))PARTS['c_'+k]={title:c.title,tag:'FRACTAL',group:'fractal',counts:Array.from({length:c.max},(_,i)=>i+1),blurb:c.blurb,
  build:n=>buildCurve(RULES[c.rule],n,c.arms).map((a,i)=>L('c'+i,a.full,ROLES[i%3],{thin:true})),
  f:n=>[c.form,`n = ${n}`,`segments: ${c.arms*c.g(n)}`]};
+PARTS.wac_w=WAC_PART;
 const PART_KEYS=Object.keys(PARTS);
 const shapeCache=new Map(),normCache=new Map();
 const shapesOf=(p,n)=>{const k=p+':'+n;if(!shapeCache.has(k))shapeCache.set(k,PARTS[p].build(n));return shapeCache.get(k);};
@@ -42,6 +44,7 @@ let proj=defaultProject(),sel=0,tab='parts',mode='edit',now=0,playing=false,rec=
 
 const polar=(r,deg)=>({x:Math.round(r*Math.sin(deg*Math.PI/180)),y:-Math.round(r*Math.cos(deg*Math.PI/180))});
 const PRESETS={
+ wac:()=>({title:'WAC 2027',subtitle:'',mark:'',palette:'custom',custom:{ground:'#ffffff',ink:'#171717',accent:'#171717',soft:'#171717'},tex:false,repeat:'single',showcase:[],layers:[newLayer('wac_w',{size:320})]}),
  medallion:()=>({title:'Medallion of Palmettes',subtitle:'Eight-fold garden: palmette, iris and heart-leaf rings around a damask core',palette:'indigo',weave:'diamond',repeat:'single',layers:[
   newLayer('damask',{n:3,size:95}),
   newLayer('iris',{n:3,size:100,...polar(175,22.5),rot:22.5,sym:'radial',k:8}),
@@ -90,7 +93,7 @@ function drawSh(sh,P,ox,oy,sc,alpha,prog){
  ctx.beginPath();for(let i=0;i<=upto;i++){const p=pts[i];i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]);}
  if(sh.closed&&prog>=.999)ctx.closePath();
  if(sh.fill){let f=col;if(sh.tone2){const g=ctx.createLinearGradient(0,sh.y0,0,sh.y1);g.addColorStop(0,col);g.addColorStop(1,P[sh.tone2]||col);f=g;}ctx.fillStyle=f;ctx.globalAlpha=alpha*smooth(prog*1.4-.2);ctx.fill();ctx.globalAlpha=alpha;}
- ctx.strokeStyle=sh.tone2?(P[sh.tone2]||col):(P[sh.edge||sh.tone]||col);ctx.stroke();ctx.restore();
+ ctx.strokeStyle=sh.tone2?(P[sh.tone2]||col):(P[sh.edge||sh.tone]||col);if(!sh.noStroke)ctx.stroke();ctx.restore();
 }
 const drawAll=(P,ox,oy,sc,alpha)=>{for(const l of visLayers())for(const s of placed(l).shapes)drawSh(s,P,ox,oy,sc,alpha,1);};
 function text(s,x,y,size,col,{font=SERIF,style='italic',align='left',alpha=1,weight='',fit=0}={}){
@@ -217,7 +220,7 @@ function loadProj(p){
 function changed(structure){mode='edit';playing=false;rebuild();updateDerived();if(structure)renderPanel();redrawSoon();save();}
 
 // ───────────── panel ─────────────
-const GRP={motif:['Motifs','Motifler'],fractal:['Fractal curves','Fraktal eğriler']};
+const GRP={brand:['Brand symbols','Marka sembolleri'],motif:['Motifs','Motifler'],fractal:['Fractal curves','Fraktal eğriler']};
 const draftSVG=wk=>{const wv=WEAVES[wk],n=Math.min(wv.P,8),c=6;let s=`<svg width="${n*c}" height="${n*c}" viewBox="0 0 ${n*c} ${n*c}" style="float:right;margin-left:6px">`;for(let j=0;j<n;j++)for(let i=0;i<n;i++)s+=`<rect x="${i*c}" y="${j*c}" width="${c-1}" height="${c-1}" fill="${wv.top(i,j)?'currentColor':'none'}" stroke="currentColor" stroke-opacity=".35"/>`;return s+'</svg>';};
 const rng=(lab,k,min,max,step,v)=>`<div class="ctl"><label>${lab}</label><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${v}"><output>${v}</output></div>`;
 const sw=c=>`<div class="sw"><i style="background:${c.ground}"></i><i style="background:${c.ink}"></i><i style="background:${c.accent}"></i><i style="background:${c.soft}"></i></div>`;
@@ -226,7 +229,7 @@ function tabParts(){
  let h=`<h3>${t2('Hazır örnek','Examples')}</h3><select data-act="preset"><option value="">${t2('Örnek yükle…','Load an example…')}</option>${opts}</select>`;
  h+=`<h3>${t2('Katmanlar (çizim sırası)','Layers (build order)')}</h3><ul id="layers">${proj.layers.map((x,i)=>`<li class="${i===sel?'on':''}"><input type="checkbox" data-act="vis" data-i="${i}" ${x.visible?'checked':''}><span class="nm" data-act="sel" data-i="${i}">${i+1}. ${PARTS[x.part].title} · n=${x.n}${x.sym!=='none'?' · '+x.sym:''}</span><button data-act="up" data-i="${i}">↑</button><button data-act="dn" data-i="${i}">↓</button><button data-act="dup" data-i="${i}">⧉</button><button data-act="del" data-i="${i}">✕</button></li>`).join('')||`<li class="hint">${t2('Henüz parça yok.','No parts yet.')}</li>`}</ul>`;
  h+=`<h3>${t2('Parça ekle','Add a part')}</h3>`;
- for(const g of ['motif','fractal'])h+=`<div class="hint">${GRP[g][lang==='tr'?1:0]}</div><div class="grid">${PART_KEYS.filter(k=>PARTS[k].group===g).map(k=>`<button data-act="add" data-part="${k}">${PARTS[k].title}<small>${PARTS[k].tag}</small></button>`).join('')}</div>`;
+ for(const g of ['brand','motif','fractal'])h+=`<div class="hint">${GRP[g][lang==='tr'?1:0]}</div><div class="grid">${PART_KEYS.filter(k=>PARTS[k].group===g).map(k=>`<button data-act="add" data-part="${k}">${PARTS[k].title}<small>${PARTS[k].tag}</small></button>`).join('')}</div>`;
  if(l){const p=PARTS[l.part];
   h+=`<h3>${t2('Seçili parça','Selected part')}: ${p.title}</h3><div class="hint">${p.blurb}</div>`;
   h+=`<div class="ctl2"><label>${t2('Sayı (n)','Count (n)')}</label><select data-k="n">${p.counts.map(c=>`<option ${c===l.n?'selected':''}>${c}</option>`).join('')}</select></div>`;
