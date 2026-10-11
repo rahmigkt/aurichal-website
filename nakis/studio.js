@@ -2,6 +2,8 @@
 import {motionSettings,poseOf,samplePose,normaliseKeys,putKey,trimLine,createHistory,EASINGS} from './studio-motion.js';
 import {motionPanel} from './studio-motion-panel.js';
 import {sceneSVG} from './studio-svg.js';
+import {geometrySettings,constructGeometry,shadeColour,triangulate} from './studio-geometry.js';
+import {geometryPanel} from './studio-geometry-panel.js';
 import {WAC_PART} from './wac-logo.js';
 import {MOTIFS} from './motifs.js';
 import {RULES,build as buildCurve} from './iter-core.js';
@@ -41,7 +43,7 @@ function norm(p){if(!normCache.has(p)){const sh=shapesOf(p,PARTS[p].counts.at(-1
 let lang=(()=>{try{return localStorage.getItem('nakis-lang')||'tr';}catch{return 'tr';}})();
 const t2=(tr,en)=>lang==='tr'?tr:en;
 let uid=1;
-const newLayer=(part,o={})=>({id:uid++,part,n:PARTS[part].counts.at(-1),x:0,y:0,size:300,rot:0,flip:false,sym:'none',k:6,shift:0,visible:true,opacity:1,reveal:1,keys:[],...o});
+const newLayer=(part,o={})=>({id:uid++,part,n:PARTS[part].counts.at(-1),x:0,y:0,size:300,rot:0,flip:false,sym:'none',k:6,shift:0,visible:true,opacity:1,reveal:1,formation:1,fold:0,growth:1,experimental:false,geo:geometrySettings(),keys:[],...o});
 const defaultProject=()=>({v:1,title:'Untitled Composition',subtitle:'A study in woven geometry',note:'',mark:'Hüseyin Rahmi Göktaş · Global Science Advancement',palette:'turkeyred',custom:{ground:'#7a1230',ink:'#f6e8d2',accent:'#f2c25a',soft:'#eba3b6'},weave:'twill22',cycle:false,repeat:'single',cell:300,pace:2.6,showcase:[],tex:true,motion:motionSettings(),layers:[]});
 let proj=defaultProject(),sel=0,tab='parts',mode='edit',now=0,playing=false,rec=null;
 let draftPose=null,selectedEase='easeInOut',onion=false,restoring=false;
@@ -77,9 +79,9 @@ function symList(l){
  return [p=>p];
 }
 function placed(l,cache=true){
- const key=JSON.stringify([l.part,l.n,l.size,l.rot,l.flip,l.sym,l.k,l.shift,l.x,l.y]);
+ const key=JSON.stringify([l.part,l.n,l.size,l.rot,l.flip,l.sym,l.k,l.shift,l.x,l.y,l.experimental,l.geo,l.formation,l.fold,l.growth]);
  if(cache&&pcache.has(key))return pcache.get(key);
- const base=shapesOf(l.part,l.n),N=norm(l.part),k=l.size/N.m,r=l.rot*Math.PI/180,cr=Math.cos(r),sr=Math.sin(r),sh=((l.shift%3)+3)%3,mp=t=>{const i=ROLES.indexOf(t);return i<0?t:ROLES[(i+sh)%3];};
+ const source=shapesOf(l.part,l.n),base=l.experimental?constructGeometry(source,l.geo,l):source,N=norm(l.part),k=l.size/N.m,r=l.rot*Math.PI/180,cr=Math.cos(r),sr=Math.sin(r),sh=((l.shift%3)+3)%3,mp=t=>{const i=ROLES.indexOf(t);return i<0?t:ROLES[(i+sh)%3];};
  const out=[],syms=symList(l);
  for(const sy of syms)for(const s of base){
   const pts=s.pts.map(p=>{let sx=(p[0]-N.cx)*k,syy=-(p[1]-N.cy)*k;if(l.flip)sx=-sx;return sy([sx*cr-syy*sr+l.x,sx*sr+syy*cr+l.y]);});
@@ -93,7 +95,7 @@ const visLayers=()=>proj.layers.filter(l=>l.visible);
 
 // ───────────── drawing ─────────────
 function drawSh(sh,P,ox,oy,sc,alpha,prog){
- const col=P[sh.tone];if(!col||alpha<=0||prog<=0)return;
+ const col=shadeColour(P[sh.tone],sh.faceShade??1);if(!col||alpha<=0||prog<=0)return;
  ctx.save();ctx.translate(ox,oy);ctx.scale(sc,sc);ctx.globalAlpha=alpha;ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=Math.max(1.1/sc,sh.lw);
  const pts=sh.fill?sh.pts:trimLine(sh.pts,prog),n=pts.length,upto=n-1;
  ctx.beginPath();for(let i=0;i<=upto;i++){const p=pts[i];i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]);}
@@ -226,7 +228,7 @@ function loadProj(p){
   if(!PARTS[r.part].counts.includes(r.n))r.n=PARTS[r.part].counts.at(-1);
   r.sym=['none','mirror','mirror4','radial','dihedral'].includes(r.sym)?r.sym:'none';
   r.k=clamp(Math.round(+r.k||6),2,24);r.shift=clamp(Math.round(+r.shift||0),0,2);r.visible=l.visible!==false;r.flip=l.flip===true;
-  r.keys=normaliseKeys(l.keys,o.motion.duration,r);return r;
+  r.keys=normaliseKeys(l.keys,o.motion.duration,r);r.experimental=l.experimental===true;r.geo=geometrySettings(l.geo);return r;
  });
  if(!HISTORIC[o.palette]&&o.palette!=='custom')o.palette='turkeyred';if(!WEAVES[o.weave])o.weave='twill22';if(!['single','halfdrop','grid'].includes(o.repeat))o.repeat='single';
  o.showcase=(Array.isArray(o.showcase)?o.showcase:[]).filter(k=>HISTORIC[k]).slice(0,20);o.pace=clamp(+o.pace||2.6,1,8);o.cell=clamp(+o.cell||300,160,520);
@@ -246,6 +248,7 @@ function tabParts(){
  h+=`<h3>${t2('Parça ekle','Add a part')}</h3>`;
  for(const g of ['brand','motif','fractal'])h+=`<div class="hint">${GRP[g][lang==='tr'?1:0]}</div><div class="grid">${PART_KEYS.filter(k=>PARTS[k].group===g).map(k=>`<button data-act="add" data-part="${k}">${PARTS[k].title}<small>${PARTS[k].tag}</small></button>`).join('')}</div>`;
  if(l){const p=PARTS[l.part];
+  h+=`<h3>${t2('Geometrik işlemler','Geometry tools')}</h3><div class="btns"><button data-act="geo-triangle">${t2('Üçgenden üret','Build from triangle')}</button><button data-act="geo-chain">${t2('Fraktal zincir','Fractal chain')}</button><button data-act="geo-fold">${t2('Katla / aç','Fold / unfold')}</button></div>`;
   h+=`<h3>${t2('Seçili parça','Selected part')}: ${p.title}</h3><div class="hint">${p.blurb}</div>`;
   h+=`<div class="ctl2"><label>${t2('Sayı (n)','Count (n)')}</label><select data-k="n">${p.counts.map(c=>`<option ${c===l.n?'selected':''}>${c}</option>`).join('')}</select></div>`;
   h+=rng(t2('Görünürlük','Opacity'),'opacity',0,1,.01,l.opacity)+rng(t2('Boyut','Size'),'size',30,900,1,l.size)+rng('X','x',-540,540,1,l.x)+rng('Y','y',-600,600,1,l.y)+rng(t2('Dönüş °','Rotate °'),'rot',-180,180,.5,l.rot);
@@ -291,10 +294,10 @@ function tabOut(){
  <h3>${t2('Proje','Project')}</h3><div class="btns"><button data-act="savep">${t2('Projeyi kaydet (.json)','Save project (.json)')}</button><button data-act="loadp">${t2('Proje aç','Open project')}</button><button data-act="newp">${t2('Yeni','New')}</button></div><input type="file" id="file" accept=".json,application/json" hidden>`;
 }
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-const TABS=[['parts','Parçalar','Parts'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['motion','Hareket','Motion'],['out','Çıktı','Output']];
+const TABS=[['parts','Parçalar','Parts'],['geometry','Geometri','Geometry'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['motion','Hareket','Motion'],['out','Çıktı','Output']];
 function renderPanel(){
  $('tabs').innerHTML=TABS.map(([k,a,b])=>`<button data-act="tab" data-key="${k}" class="${tab===k?'on':''}">${t2(a,b)}</button>`).join('');
- $('panel').innerHTML={parts:tabParts,colour:tabColour,weave:tabWeave,text:tabText,motion:()=>motionPanel(proj,sel,Math.min(now,proj.motion.duration),draftPose,selectedEase,onion,PARTS,t2),out:tabOut}[tab]();
+ $('panel').innerHTML={parts:tabParts,geometry:()=>geometryPanel(proj.layers[sel],proj.layers[sel]?shapesOf(proj.layers[sel].part,proj.layers[sel].n):[],PARTS,t2),colour:tabColour,weave:tabWeave,text:tabText,motion:()=>motionPanel(proj,sel,Math.min(now,proj.motion.duration),draftPose,selectedEase,onion,PARTS,t2),out:tabOut}[tab]();
  $('pp').textContent=playing?'⏸':t2('▶ Film','▶ Film');$('sub').textContent=t2('— parçalardan motif, motiften kumaş','— parts into motif, motif into cloth');
  updateDerived();
 }
@@ -338,6 +341,32 @@ function captureKey(){
  history.flush();
  const l=proj.layers[sel];if(!l)return;
  try{l.keys=putKey(l,now,draftPose||samplePose(l,now,proj.motion.duration),selectedEase,proj.motion.duration);}catch{toast(t2('Katman başına en fazla 128 anahtar kare','Maximum 128 keyframes per layer'));return;}draftPose=null;motionChanged();
+}
+function geometryCopy(){
+ let l=proj.layers[sel];if(!l)return null;
+ if(!l.experimental){
+  const copy={...JSON.parse(JSON.stringify(l)),id:uid++,experimental:true,visible:true,geo:geometrySettings(),keys:[]};
+  l.visible=false;proj.layers.splice(sel+1,0,copy);sel++;l=copy;
+ }
+ draftPose=null;playing=false;mode='edit';tab='geometry';return l;
+}
+function geometryAction(action){
+ const source=proj.layers[sel];
+ if(action!=='chain'&&source&&!shapesOf(source.part,source.n).some(s=>s.fill&&s.closed&&triangulate(s.pts).length)){toast(t2('Bu işlem için kapalı yüzeyli bir parça seçin','Choose a filled part for this operation'));return;}
+ const l=geometryCopy();if(!l)return;
+ if(action==='triangle'){l.geo.kind='triangle';l.formation=0;}
+ if(action==='fold'){l.geo.kind='fold';l.fold=.7;}
+ if(action==='chain'){l.geo.chain=true;l.growth=1;l.size=Math.min(l.size,160);l.y=180;}
+ l.geo=geometrySettings(l.geo);changed(true);
+}
+function animateGeometry(action){
+ const l=geometryCopy();if(!l)return;
+ if(action==='triangle')l.geo.kind='triangle';if(action==='fold')l.geo.kind='fold';if(action==='chain')l.geo.chain=true;
+ const d=proj.motion.duration,b=poseOf(l),keys=[];
+ if(action==='fold'){
+  b.fold=0;keys.push({t:0,pose:b,ease:'easeInOut'},{t:d/2,pose:poseOf({...b,fold:1}),ease:'easeInOut'},{t:d,pose:b,ease:'easeInOut'});
+ }else{const channel=action==='triangle'?'formation':'growth';b[channel]=0;keys.push({t:0,pose:b,ease:'easeInOut'},{t:d*.85,pose:poseOf({...b,[channel]:1}),ease:'easeInOut'},{t:d,pose:poseOf({...b,[channel]:1}),ease:'hold'});}
+ l.keys=keys;proj.motion.enabled=true;now=0;draftPose=null;changed(true);tab='geometry';mode='motion';showMotion(0);renderPanel();play();
 }
 let last=performance.now();
 function loop(ts){
@@ -387,7 +416,9 @@ document.addEventListener('click',e=>{
  if(rec){if(a==='rec-stop')stopRecording();return;}
  if(a==='undo'){restoreHistory('undo');return;}if(a==='redo'){restoreHistory('redo');return;}
  history.flush();
- if(a==='tab'){tab=key;if(tab==='motion'){editMotion();return;}draftPose=null;renderPanel();return;}
+ if(a==='tab'){tab=key;if(tab==='motion'){editMotion();return;}if(tab==='geometry'){mode='edit';playing=false;redraw();}draftPose=null;renderPanel();return;}
+ if(a==='geo-triangle'){geometryAction('triangle');return;}if(a==='geo-chain'){geometryAction('chain');return;}if(a==='geo-fold'){geometryAction('fold');return;}
+ if(a.startsWith('geo-play-')){animateGeometry(a.slice(9));return;}
  if(a==='motion-edit'){draftPose=null;mode='edit';playing=false;tab='parts';renderPanel();redraw();return;}
  if(a==='motion-start'){draftPose=null;playing=false;showMotion(0);renderPanel();return;}
  if(a==='motion-play'){if(!proj.motion.enabled){proj.motion.enabled=true;save();}play();return;}
@@ -418,6 +449,12 @@ document.addEventListener('click',e=>{
 document.addEventListener('input',e=>{
  const el=e.target,k=el.dataset.k,p=el.dataset.p,a=el.dataset.act,c=el.dataset.c;
  if(rec)return;
+ if(el.dataset.geo){const l=geometryCopy();if(!l)return;const k=el.dataset.geo;
+  if(['formation','fold','growth'].includes(k))l[k]=poseOf({...l,[k]:+el.value})[k];
+  else l.geo=geometrySettings({...l.geo,[k]:el.type==='checkbox'?el.checked:(k==='kind'?el.value:+el.value)});
+  changed(false);const out=el.parentNode.querySelector('output');if(out)out.textContent=el.value;
+  if(['kind','chain','mesh'].includes(k))renderPanel();return;
+ }
  if(el.dataset.pose){const l=proj.layers[sel];if(!l)return;draftPose=poseOf({...draftPose||samplePose(l,now,proj.motion.duration),[el.dataset.pose]:+el.value});el.parentNode.querySelector('output').textContent=el.value;mode='motion';playing=false;drawMotion(now);const msg=$('motion-draft');if(msg)msg.textContent=t2('Poz henüz kaydedilmedi. Anahtar kare ekle düğmesine basın.','Pose not saved yet. Press Add keyframe.');return;}
  if(el.dataset.motion){const k=el.dataset.motion;
   if(k==='duration')return;
