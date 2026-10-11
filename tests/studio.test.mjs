@@ -5,6 +5,30 @@ import {test} from 'node:test';
 const root=new URL('../nakis/',import.meta.url),cache=new Map();
 function uri(name){if(cache.has(name))return cache.get(name);let s=fs.readFileSync(new URL(name,root),'utf8');s=s.replace(/from\s*(['"])\.\/([^'"]+)\1/g,(_,q,n)=>'from '+JSON.stringify(uri(new URL(n,'https://test/'+name).pathname.slice(1))));const u='data:text/javascript;base64,'+Buffer.from(s).toString('base64');cache.set(name,u);return u;}
 const motion=await import(uri('studio-motion.js')),svgModule=await import(uri('studio-svg.js'));
+const geometry=await import(uri('studio-geometry.js')),{WAC_PART}=await import(uri('wac-logo.js'));
+const logo=WAC_PART.build();
+test('triangulation preserves W polygon area and triangle assembly has exact endpoints',()=>{
+ const area=p=>Math.abs(p.reduce((s,a,i)=>{const b=p[(i+1)%p.length];return s+a[0]*b[1]-b[0]*a[1];},0))/2;
+ for(const sh of logo){const mesh=geometry.triangulate(sh.pts);assert(Math.abs(mesh.reduce((s,ids)=>s+area(ids.map(i=>sh.pts[i])),0)-area(sh.pts))<1e-8);}
+ const initial=geometry.constructGeometry(logo,{kind:'triangle'},{formation:0});assert.equal(initial.length,6);assert(initial.every(s=>s.pts.length===3));assert(initial.every(s=>JSON.stringify(s.pts)===JSON.stringify(initial[0].pts)));
+ assert.deepEqual(geometry.constructGeometry(logo,{kind:'triangle'},{formation:1}),logo);
+});
+test('rigid folded panels preserve 3D edge lengths and common hinge endpoints',()=>{
+ for(const sh of logo){const mesh=geometry.foldMesh(sh.pts,.8,145);
+  for(const panel of mesh){for(let i=0;i<3;i++){const j=(i+1)%3,a=sh.pts[panel.ids[i]],b=sh.pts[panel.ids[j]],pa=panel.pts3[i],pb=panel.pts3[j];assert(Math.abs(Math.hypot(a[0]-b[0],a[1]-b[1])-Math.hypot(...pa.map((v,k)=>v-pb[k])))<1e-7);}
+   if(panel.hinge){const parent=mesh[panel.hinge.parent];for(const id of panel.hinge.edge){const a=parent.pts3[parent.ids.indexOf(id)],b=panel.pts3[panel.ids.indexOf(id)];assert(Math.hypot(...a.map((v,i)=>v-b[i]))<1e-7);}}
+  }
+ }
+ assert.deepEqual(geometry.constructGeometry(logo,{kind:'fold'},{fold:0}),logo);
+});
+test('fractal chain copies follow a bounded recursive scaling rule',()=>{
+ const g={chain:true,depth:3,ratio:.5,angle:38,spacing:1.3};
+ const a=geometry.constructGeometry(logo,g,{growth:0}),b=geometry.constructGeometry(logo,g,{growth:1});
+ assert.equal(a.length,3);assert.equal(b.length,3*(1+2+4+8));
+ const shape=b.find(s=>s.id.endsWith('-0L')),base=logo.find(s=>shape.id.startsWith(s.id+'-'));
+ assert(Math.abs(Math.hypot(shape.pts[0][0]-shape.pts[1][0],shape.pts[0][1]-shape.pts[1][1])/Math.hypot(base.pts[0][0]-base.pts[1][0],base.pts[0][1]-base.pts[1][1])-.5)<1e-10);
+ assert.deepEqual(geometry.constructGeometry(logo,g,{growth:.6}),geometry.constructGeometry(logo,g,{growth:.6}));
+});
 test('uneven polyline reveal follows arc length, not vertex count',()=>{
  assert.deepEqual(motion.trimLine([[0,0],[1,0],[10,0]],.5),[[0,0],[1,0],[5,0]]);
  assert.deepEqual(motion.trimLine([[0,0],[0,0],[10,0]],.5),[[0,0],[0,0],[5,0]]);
@@ -93,4 +117,15 @@ test('motion example uses the actual fractal and motif renderer within a bounded
  assert(!first.equals(mid));assert(first.equals(last));
  fs.writeFileSync(new URL('../moving-geometry-preview.png',import.meta.url),mid);
  const start=performance.now();for(let i=0;i<60;i++)window.renderAt(i/5);console.log('60 full-size three-layer geometry frames:',Math.round(performance.now()-start),'ms');
+});
+test('user actions produce triangle, chain and fold animations while keeping source logo intact',()=>{
+ window.studio.load('wac');const source=JSON.parse(JSON.stringify(window.studio.project.layers[0]));
+ click('geo-triangle');assert.equal(window.studio.project.layers.length,2);assert.equal(window.studio.project.layers[0].visible,false);
+ assert.deepEqual({...window.studio.project.layers[0],visible:true},source);
+ const copy=window.studio.project.layers[1];assert.equal(copy.experimental,true);assert.equal(copy.formation,0);
+ click('geo-play-triangle');window.renderAt(0);const start=cv.toBuffer('image/png');window.renderAt(window.filmTotal());const end=cv.toBuffer('image/png');assert(!start.equals(end));
+ fs.writeFileSync(new URL('../triangle-seed.png',import.meta.url),start);fs.writeFileSync(new URL('../triangle-logo.png',import.meta.url),end);
+ window.studio.load('wac');click('geo-chain');click('geo-play-chain');window.renderAt(0);const root=cv.toBuffer('image/png');window.renderAt(window.filmTotal());const tree=cv.toBuffer('image/png');assert(!root.equals(tree));fs.writeFileSync(new URL('../fractal-chain.png',import.meta.url),tree);
+ window.studio.load('wac');click('geo-fold');click('geo-play-fold');window.renderAt(0);const flat=cv.toBuffer('image/png');window.renderAt(window.filmTotal()/2);const folded=cv.toBuffer('image/png');window.renderAt(window.filmTotal());assert(flat.equals(cv.toBuffer('image/png')));assert(!flat.equals(folded));fs.writeFileSync(new URL('../folded-logo.png',import.meta.url),folded);
+ const p=JSON.parse(JSON.stringify(window.studio.project));window.loadProject(p);window.renderAt(window.filmTotal()/2);assert(folded.equals(cv.toBuffer('image/png')));
 });
