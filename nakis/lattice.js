@@ -2,13 +2,15 @@
 // Exact part: honeycomb of hexagons, circumradius 1 (= the unit L of the triangular lattice),
 // centres c(i,j)=√3·(i·e30 + j·e90); vertices v_m = c + R(θ)(cos 60m, sin 60m).
 // Approximate part: all tiles share one angle θ(t); the original's tangled transitions are not reproduced.
+import {expand} from './iter-core.js';
 const S3=Math.sqrt(3),D=Math.PI/180;
 export const TYPES={
  ring:{tr:'Halka',en:'Ring',ch:[]},
  spokes:{tr:'Işın',en:'Spokes',ch:[],spk:1},
  star:{tr:'Yıldız {6/2}',en:'Star {6/2}',ch:[2]},
  asanoha:{tr:'Asanoha',en:'Asanoha',ch:[2],spk:1},
- web:{tr:'Ağ',en:'Web',ch:[2,3],spk:0}
+ web:{tr:'Ağ',en:'Web',ch:[2,3],spk:0},
+ custom:{tr:'Özel şekil',en:'Custom shape',ch:[],custom:1}
 };
 export const TYPE_ORDER=Object.keys(TYPES);
 export const SHAPES={triangle:{tr:'Üçgen (C3)',en:'Triangle (C3)'},disc:{tr:'Disk (C6)',en:'Disc (C6)'}};
@@ -28,7 +30,7 @@ export function centres(size,shape){
  return out;
 }
 // returns {dots:[[x,y]], edges:[[x1,y1,x2,y2,len]]} in units of L, for hexagon angle theta (radians)
-export function build({size=3,shape='triangle',type='asanoha',theta=0,omega=0}){
+export function build({size=3,shape='triangle',type='asanoha',theta=0,omega=0,gen=null,depth=1}){
  const T=TYPES[type],dots=new Map(),edges=[],key=(x,y)=>Math.round(x*500)+','+Math.round(y*500);
  const add=(x,y)=>{dots.set(key(x,y),[x,y]);};
  const rot=(x,y,a)=>[x*Math.cos(a)-y*Math.sin(a),x*Math.sin(a)+y*Math.cos(a)];
@@ -36,6 +38,7 @@ export function build({size=3,shape='triangle',type='asanoha',theta=0,omega=0}){
   const v=[];for(let m=0;m<6;m++){const a=theta+m*60*D;v.push([cx+Math.cos(a),cy+Math.sin(a)]);}
   v.forEach(p=>add(p[0],p[1]));
   const E=(p,q)=>edges.push([p[0],p[1],q[0],q[1],Math.hypot(p[0]-q[0],p[1]-q[1])]);
+  if(T.custom&&gen){const rule={g:gen.pts,alt:!!gen.alt};for(let m=0;m<6;m++){let pts=[v[m],v[(m+1)%6]];for(let d=0;d<depth;d++)pts=expand(pts,rule).full;pts.forEach(q=>add(q[0],q[1]));for(let i=1;i<pts.length;i++)E(pts[i-1],pts[i]);}continue;}
   for(let m=0;m<6;m++)E(v[m],v[(m+1)%6]);
   if(T.spk){add(cx,cy);for(let m=0;m<6;m++)E([cx,cy],v[m]);}
   for(const k of T.ch)for(let m=0;m<(k===3?3:6);m++)E(v[m],v[(m+k)%6]);
