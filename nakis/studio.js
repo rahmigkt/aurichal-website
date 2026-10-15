@@ -7,13 +7,14 @@ import {WEAVES,WEAVE_ORDER,MOTIF_WEAVE,weaveFor,weaveTile} from './weave.js';
 import {HISTORIC,HISTORIC_ORDER,contrast} from './palettes.js';
 import {brocadeOver} from './cloth.js';
 import * as LAT from './lattice.js';
+import * as SPI from './spiral.js';
 import {expand as genExpand} from './iter-core.js';
 
 const W=1080,H=1350,CX=540,CY=625,ROLES=['ink','accent','soft'];
 const SERIF='"Cormorant Garamond","Times New Roman",Georgia,serif',SANS='Poppins,system-ui,-apple-system,"Segoe UI",sans-serif',GOLD='#f2c14e',CORAL='#ff6b5e';
 const INTRO=2.4,HOLD=1.6,REP=8,GROUND=4.5,SW=4.4,FADE=1,TAIL=2.5,OUTRO=3.5;
 const $=id=>document.getElementById(id);
-const cv=$('c'),mctx=cv.getContext('2d',{willReadFrequently:true});let ctx=mctx;
+const cv=$('c'),mctx=cv.getContext('2d',{willReadFrequently:true});let ctx=mctx,TARGET=null,SCL=1,OV={};
 const ca=document.createElement('canvas'),cb=document.createElement('canvas');ca.width=cb.width=W;ca.height=cb.height=H;
 const caX=ca.getContext('2d',{willReadFrequently:true}),cbX=cb.getContext('2d',{willReadFrequently:true});
 
@@ -210,7 +211,7 @@ function drawEdit(tex){
  ctx.restore();
  if(!proj.layers.length){text(t2('Sağdan bir parça ekleyin ya da hazır örnek yükleyin','Add a part on the right or load an example'),CX,CY,34,'#fff',{align:'center',alpha:.6,style:'normal',font:SANS});}
 }
-function redraw(){if(mode==='shp'){drawShape();return;}if(mode==='lat'){drawLat();return;}if(mode==='film'){frame(now);return;}drawEdit(false);clearTimeout(texTimer);needTex=true;texTimer=setTimeout(()=>{if(mode==='edit'){drawEdit(true);needTex=false;}},450);}
+function redraw(){if(mode==='spi'){drawSpiral();return;}if(mode==='shp'){drawShape();return;}if(mode==='lat'){drawLat();return;}if(mode==='film'){frame(now);return;}drawEdit(false);clearTimeout(texTimer);needTex=true;texTimer=setTimeout(()=>{if(mode==='edit'){drawEdit(true);needTex=false;}},450);}
 let raf=0;const redrawSoon=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;redraw();});};
 
 // ───────────── persistence ─────────────
@@ -285,10 +286,10 @@ function tabOut(){
 // ───────────── lattice tab (rotating hexagons) ─────────────
 const lat={size:3,shape:'triangle',type:'asanoha',theta:0,anim:true,dots:true,t:0,cycle:['ring','spokes','star','asanoha','web','custom'],depth:1};
 function drawLat(){
- ctx=mctx;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.fillStyle='#f4f0e6';ctx.fillRect(0,0,W,H);
- let th=lat.theta*Math.PI/180,type=lat.type;
- if(lat.anim){const tl=LAT.timeline(lat.t,lat.cycle);th=tl.theta;type=tl.type;}
- const g=LAT.build({size:lat.size,shape:lat.shape,type,theta:th,gen:proj.gen,depth:lat.depth}),sc=Math.min(900/(lat.size*3.4+2.4),120);
+ ctx=TARGET||mctx;ctx.setTransform(SCL,0,0,SCL,0,0);ctx.globalAlpha=1;ctx.fillStyle='#f4f0e6';ctx.fillRect(0,0,W,H);
+ let th=lat.theta*Math.PI/180,type=OV.type||lat.type;
+ if(OV.theta!==undefined)th=OV.theta;else if(lat.anim&&!OV.type){const tl=LAT.timeline(lat.t,lat.cycle);th=tl.theta;type=tl.type;}
+ const g=LAT.build({size:OV.size||lat.size,shape:lat.shape,type,theta:th,gen:proj.gen,depth:lat.depth}),sc=Math.min(900/((OV.size||lat.size)*3.4+2.4),120);
  ctx.save();ctx.translate(CX,CY+(lat.shape==='triangle'?0:0));ctx.scale(sc,-sc);
  ctx.strokeStyle='#141210';ctx.lineWidth=2.4/sc;ctx.lineCap='round';ctx.beginPath();for(const e of g.edges){ctx.moveTo(e[0],e[1]);ctx.lineTo(e[2],e[3]);}ctx.stroke();
  if(lat.dots){ctx.fillStyle='#141210';for(const d of g.dots){ctx.beginPath();ctx.arc(d[0],d[1],7/sc,0,7);ctx.fill();}}
@@ -322,7 +323,7 @@ Line lengths: side/spoke = 1, short diagonal = √3, diameter = 2.
 At θ = 0° and 30° the vertices sit on the 0°/60° lattice or the lattice turned 30°.
 θ(t): 1 s hold, 1.4 s smooth turn (3x²−2x³), tile changes at each hold.
 Exact: the lattice structure of the hold patterns. Approximate: the transitions (in the original, dots split and merge).`)}</div>
- <div class="btns"><button data-act="png">PNG</button></div>`;
+ ${actBtns()}`;
 }
 
 // ───────────── shape tab (your shape as the generator) ─────────────
@@ -335,8 +336,8 @@ function drawPad(){const c=$('pad');if(!c)return;const x=c.getContext('2d');x.cl
  x.strokeStyle='#141210';x.lineWidth=2.5;x.beginPath();P.forEach((q,i)=>i?x.lineTo(pu(q[0]),pv(q[1])):x.moveTo(pu(q[0]),pv(q[1])));x.stroke();
  P.forEach((q,i)=>{x.fillStyle=(i===0||i===P.length-1)?'#8a5a1f':'#141210';x.beginPath();x.arc(pu(q[0]),pv(q[1]),(i===0||i===P.length-1)?6:7,0,7);x.fill();});}
 function drawShape(){
- ctx=mctx;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.fillStyle='#f4f0e6';ctx.fillRect(0,0,W,H);
- const n=Math.min(shp.n,genMax()),cur=PARTS.c_custom.build(n);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+ ctx=TARGET||mctx;ctx.setTransform(SCL,0,0,SCL,0,0);ctx.globalAlpha=1;ctx.fillStyle='#f4f0e6';ctx.fillRect(0,0,W,H);
+ const n=OV.n!==undefined?OV.n:Math.min(shp.n,genMax()),cur=PARTS.c_custom.build(n);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
  for(const c of cur)for(const q of c.pts){x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);y0=Math.min(y0,q[1]);y1=Math.max(y1,q[1]);}
  const sc=Math.min(900/(x1-x0||1),900/(y1-y0||1)),mx=(x0+x1)/2,my=(y0+y1)/2;
  ctx.save();ctx.translate(CX,CY);ctx.scale(sc,sc);ctx.translate(-mx,-my);ctx.lineWidth=Math.max(.6,Math.min(2.6,1.2*n/3))/sc;ctx.lineJoin='round';ctx.strokeStyle='#141210';
@@ -352,6 +353,7 @@ function tabShape(){
  <div class="ctl"><label>${t2('Kol sayısı','Arms')}</label><input type="range" data-g="arms" min="1" max="8" step="1" value="${proj.gen.arms}"><output>${proj.gen.arms}</output></div>
  <div class="ctl"><label>${t2('Adım (n)','Step (n)')}</label><input type="range" data-g="n" min="1" max="${genMax()}" step="1" value="${Math.min(shp.n,genMax())}"><output>${Math.min(shp.n,genMax())}</output></div>
  <div class="btns"><button data-act="gundo">${t2('Son noktayı sil','Remove last point')}</button><button data-act="gclear">${t2('Temizle','Clear')}</button><button class="pri" data-act="gadd">${t2('Kompozisyona parça olarak ekle','Add to composition as a part')}</button></div>
+ ${actBtns()}
  <h3>${t2('Matematik','Mathematics')}</h3><div class="desc">${t2(
 `Üreteç: P₀=(0,0), P₁…Pₖ (çizdikleriniz), Pₖ₊₁=(1,0).
 Her parça AB için Pᵢ' = A + (B−A)·xᵢ + ⟂(B−A)·yᵢ  (⟂ = 90° döndürme).
@@ -380,11 +382,82 @@ function bindPad(){
  c.onpointermove=e=>{if(dr<0)return;const p=xy(e);proj.gen.pts[dr]=[Math.round(iu(p[0])*100)/100,Math.round(iv(p[1])*100)/100];upd();};
  c.onpointerup=()=>{if(dr>=0){dr=-1;renderPanel();upd();}};
 }
+
+// ───────────── spiral tab ─────────────
+const spi={k:.38,phi:60,K:30,fill:.74,speed:.35,dashes:1,sides:6,custom:false,play:true,t:0,zoom:.12};
+function tilePoly(){const n=spi.sides;let pts=Array.from({length:n},(_,m)=>[Math.cos(m*2*Math.PI/n),Math.sin(m*2*Math.PI/n)]);
+ if(!spi.custom||!proj.gen.pts.length)return pts;const out=[];for(let m=0;m<n;m++){const seg=genExpand([pts[m],pts[(m+1)%n]],genRule()).full;seg.pop();out.push(...seg);}return out;}
+function drawSpiral(){
+ ctx=TARGET||mctx;ctx.setTransform(SCL,0,0,SCL,0,0);ctx.globalAlpha=1;ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+ const t=OV.st!==undefined?OV.st:spi.t,sc=SPI.scene({k:spi.k,phi:spi.phi,K:spi.K,fill:spi.fill,speed:spi.speed,dashes:spi.dashes},(t*spi.zoom)%1);
+ const poly=tilePoly(),cnt=OV.count!==undefined?OV.count:1e9;ctx.save();ctx.translate(CX,CY-30);
+ if(spi.dashes&&cnt>=1e9)for(const d of sc.dashes){if(Math.abs(d.x)>800||Math.abs(d.y)>900)continue;ctx.save();ctx.translate(d.x,d.y);ctx.rotate(d.ang);ctx.fillStyle=sc.dashHue(d,t);ctx.beginPath();ctx.ellipse(0,0,Math.max(.4,d.l),Math.max(.3,d.w),0,0,7);ctx.fill();ctx.restore();}
+ let k=0;for(const T of sc.tiles){if(k++>=cnt)break;if(Math.abs(T.x)>900||Math.abs(T.y)>1000)continue;ctx.save();ctx.translate(T.x,T.y);ctx.rotate(T.rot);ctx.scale(T.r,T.r);ctx.fillStyle=sc.hue(T.i,T.j,t);ctx.beginPath();poly.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]));ctx.closePath();ctx.fill();ctx.restore();}
+ ctx.restore();
+ const o=$('spinfo');if(o)o.textContent=`${sc.tiles.length} ${t2('kalıp','tiles')} · ${sc.dashes.length} ${t2('çizgi','dashes')}`;
+ spi._n=sc.tiles.filter(T=>Math.abs(T.x)<=900&&Math.abs(T.y)<=1000).length;
+}
+function tabSpiral(){
+ const r=(k,a,b,st,tr,en)=>`<div class="ctl"><label>${t2(tr,en)}</label><input type="range" data-s="${k}" min="${a}" max="${b}" step="${st}" value="${spi[k]}"><output>${spi[k]}</output></div>`;
+ return `<h3>${t2('Spiral kaplama','Spiral tiling')}</h3><div class="hint">${t2('Fazlıoğlu altıgen spiral animasyonundan: kalıplar bir kafes üzerinde durur, karmaşık üstel dönüşümle logaritmik spirale sarılır.','From the Fazlıoğlu hexagon-spiral animation: tiles sit on a lattice and are wound into a logarithmic spiral by the complex exponential.')}</div>
+ ${r('k',.15,.7,.01,'Sıkılık |c|','Tightness |c|')}${r('phi',20,85,1,'Eğim φ (°)','Pitch φ (°)')}${r('K',12,60,1,'Ölçek','Scale')}${r('fill',.4,1,.01,'Doluluk','Fill')}${r('sides',3,8,1,'Kenar sayısı','Sides')}${r('speed',0,1,.01,'Renk hızı','Colour speed')}${r('zoom',0,.4,.01,'Yakınlaşma','Zoom rate')}
+ <div class="hint"><label><input type="checkbox" data-s="custom" ${spi.custom?'checked':''}> ${t2('Kalıp kenarları benim şeklim','Tile edges use my shape')}</label> &nbsp; <label><input type="checkbox" data-s="dashes" ${spi.dashes?'checked':''}> ${t2('Çizgi tozu','Dash dust')}</label> &nbsp; <label><input type="checkbox" data-s="play" ${spi.play?'checked':''}> ${t2('Canlandır','Animate')}</label></div>
+ <div class="hint" id="spinfo"></div>
+ ${actBtns()}
+ <h3>${t2('Renkler (videodan ölçüldü)','Colours (measured from the video)')}</h3><div class="sw" style="height:34px">${SPI.PAL_FZ.map(c=>`<i style="background:${c}"></i>`).join('')}</div><div class="hint">${SPI.PAL_FZ.join(' · ')}<br>${t2('Zemin siyah. Doygunluk ≈ 0,82, parlaklık ≈ 0,85. Renk her kalıpta bir sonraki tona kayar ve zamanla döner.','Ground black. Saturation ≈ 0.82, brightness ≈ 0.85. Colour steps to the next tone from tile to tile and cycles with time.')}</div>
+ <h3>${t2('Matematik','Mathematics')}</h3><div class="desc">${t2(
+`Merkezler: z = i + j·ω, ω = e^{iπ/3} (altıgen kafes).
+Dönüşüm: w = exp(c·z), c = k·e^{iφ}.
+Kalıp: w'ya konur, |c·w|/√3 ile ölçeklenir, arg(c·w) kadar döner; komşular birbirine değer.
+Halka adımı (i+1): ölçek ×e^{k cos φ}, açı +k sin φ. Kol adımı (j+1): ×e^{k cos(φ+60°)}.
+Yakınlaşma: tüm w'lar exp(−c·s) ile çarpılır; s=1'de kafes bir adım kaymış olur, desen kendini tekrarlar (kusursuz döngü).
+Renk: kalıp rengi paletten (⌊0,6i + 1,7j + 8·hız·t⌋ mod 8).
+Kesin: spiral yapı ve palet. Yaklaşık: k, φ değerleri videoya göz kararı uyduruldu.`,
+`Centres: z = i + j·ω, ω = e^{iπ/3} (hexagonal lattice).
+Map: w = exp(c·z), c = k·e^{iφ}.
+Tile: placed at w, scaled by |c·w|/√3, turned by arg(c·w); neighbours touch.
+Ring step (i+1): scale ×e^{k cos φ}, angle +k sin φ. Arm step (j+1): ×e^{k cos(φ+60°)}.
+Zoom: every w is multiplied by exp(−c·s); at s=1 the lattice has moved one step and the picture repeats (seamless loop).
+Colour: tile colour from the palette (⌊0.6i + 1.7j + 8·speed·t⌋ mod 8).
+Exact: the spiral structure and palette. Approximate: k, φ were fitted to the video by eye.`)}</div>`;
+}
+// ───────────── steps film + snapshots ─────────────
+const STEP_DUR=1.6;
+const actBtns=()=>`<div class="btns"><button class="pri" data-act="steps">${t2('Adımları oynat','Play the steps')}</button><button data-act="recsteps">${t2('● Adımları WebM kaydet','● Record steps (WebM)')}</button><button data-act="snap">${t2('Enstantane (3K PNG, etiketli)','Snapshot (3K PNG, labelled)')}</button></div>`;
+function stepList(){
+ if(tab==='shape'){const m=Math.min(shp.n,genMax()),a=[];for(let n=0;n<=m;n++)a.push({ov:{n},cap:`n = ${n}`,sub:`${proj.gen.arms*Math.pow(genM(),n)} segments`,k:'shp'});return a;}
+ if(tab==='lat'){const a=[];for(let z=1;z<=lat.size;z++)a.push({ov:{size:z,type:lat.type,theta:lat.theta*Math.PI/180},cap:`rings ${z} / ${lat.size}`,sub:LAT.TYPES[lat.type].en,k:'lat'});
+  for(const ty of lat.cycle)if(ty!==lat.type)a.push({ov:{size:lat.size,type:ty,theta:lat.theta*Math.PI/180},cap:LAT.TYPES[ty].en,sub:'same lattice, new tile',k:'lat'});
+  for(let q=1;q<=4;q++)a.push({ov:{size:lat.size,type:lat.type,theta:q*Math.PI/12},cap:`turn ${q*15}°`,sub:'hexagons rotate about their centres',k:'lat'});return a;}
+ const N=8,tot=spi._n||200,a=[];for(let q=1;q<=N;q++)a.push({ov:{count:Math.round(tot*q/N),st:0},cap:`ring ${q} / ${N}`,sub:'tiles wound onto the spiral, centre outward',k:'spi'});
+ a.push({ov:{st:0},cap:'dust added',sub:'',k:'spi'});return a;
+}
+let stepsArr=[],stepsPlayT=0;
+const stepsTotal=()=>stepsArr.length*STEP_DUR+1.2;
+function capBar(c,sub,dark){ctx.save();ctx.setTransform(SCL,0,0,SCL,0,0);ctx.fillStyle=dark?'rgba(0,0,0,.55)':'rgba(244,240,230,.8)';ctx.fillRect(0,1190,W,160);ctx.fillStyle=dark?'#f2c14e':'#8a5a1f';ctx.font='500 40px Poppins,system-ui,sans-serif';ctx.textAlign='left';ctx.fillText('STEP '+c,70,1250);ctx.fillStyle=dark?'#efe6d2':'#241f17';ctx.font='28px Poppins,system-ui,sans-serif';ctx.fillText(sub,70,1298);ctx.restore();}
+function showSteps(t){mode='steps';now=t;const k=Math.min(stepsArr.length-1,Math.floor(t/STEP_DUR)),e=stepsArr[k];OV={...e.ov};
+ if(e.k==='shp')drawShape();else if(e.k==='lat')drawLat();else{if(OV.st===undefined)OV.st=0;if(k===stepsArr.length-1)OV={st:t*.5};drawSpiral();}
+ OV={};capBar(`${k+1} / ${stepsArr.length} · ${e.cap}`,e.sub,e.k==='spi');const q=Math.min(1,t/stepsTotal());$('seek').value=Math.round(q*1000);$('tm').textContent=`0:${String(Math.floor(t)).padStart(2,'0')}`;}
+function playSteps(withRec){stepsArr=stepList();now=0;mode='steps';playing=true;$('pp').textContent='⏸';
+ if(withRec){if(!window.MediaRecorder){toast(t2('Bu tarayıcı kayıt desteklemiyor','Recording is not supported in this browser'));return;}
+  const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(m=>MediaRecorder.isTypeSupported(m)),ch=[];const r=new MediaRecorder(cv.captureStream(30),{mimeType:mime,videoBitsPerSecond:10e6});r.ondataavailable=e=>e.data.size&&ch.push(e.data);r.onstop=()=>download(new Blob(ch,{type:'video/webm'}),`nakis-steps-${tab}.webm`);rec=r;r.start(250);toast(t2('Kayıt başladı — sekmeyi açık tutun','Recording — keep this tab open'));}
+ showSteps(0);}
+function snapshot(){
+ const kind={shape:'shp',lat:'lat',spiral:'spi'}[tab];if(!kind){cv.toBlob(b=>b&&download(b,`nakis-snapshot-${slug()}.png`));return;}
+ const c=document.createElement('canvas');SCL=3;c.width=W*3;c.height=H*3;TARGET=c.getContext('2d');
+ try{if(kind==='shp')drawShape();else if(kind==='lat')drawLat();else drawSpiral();
+  const x=TARGET,dark=kind==='spi',title={shp:'Your Shape · iterated',lat:'Rotating Hexagon Lattice',spi:'Conformal Spiral Tiling'}[kind];
+  const form={shp:`generator: ${proj.gen.pts.length+1} pieces · arms ${proj.gen.arms} · D ≈ ${genDim()?genDim().toFixed(4):'—'}`,lat:`c = √3(i·e30° + j·e90°) · vₘ = c + R(θ)(cos 60°m, sin 60°m)`,spi:`w = exp(c·z), c = ${spi.k}·e^{i${spi.phi}°}`}[kind];
+  x.setTransform(3,0,0,3,0,0);x.fillStyle=dark?'rgba(0,0,0,.7)':'rgba(244,240,230,.9)';x.fillRect(0,1130,W,220);x.fillStyle=dark?'#f2c14e':'#8a5a1f';x.font='500 44px Poppins,system-ui,sans-serif';x.textAlign='left';x.fillText('NAKIŞ — '+title,70,1195);
+  x.fillStyle=dark?'#efe6d2':'#241f17';x.font='26px Poppins,system-ui,sans-serif';x.fillText(form,70,1245);x.globalAlpha=.6;x.font='22px Poppins,system-ui,sans-serif';x.fillText(proj.mark,70,1310);x.globalAlpha=1;}
+ finally{TARGET=null;SCL=1;}
+ c.toBlob(b=>b&&download(b,`nakis-snapshot-${kind}-${Date.now()%1e6}.png`));
+}
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-const TABS=[['parts','Parçalar','Parts'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['shape','Şekil','Shape'],['lat','Kafes','Lattice'],['out','Çıktı','Output']];
+const TABS=[['parts','Parçalar','Parts'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['shape','Şekil','Shape'],['lat','Kafes','Lattice'],['spiral','Spiral','Spiral'],['out','Çıktı','Output']];
 function renderPanel(){
  $('tabs').innerHTML=TABS.map(([k,a,b])=>`<button data-act="tab" data-key="${k}" class="${tab===k?'on':''}">${t2(a,b)}</button>`).join('');
- $('panel').innerHTML={parts:tabParts,colour:tabColour,weave:tabWeave,text:tabText,shape:tabShape,lat:tabLat,out:tabOut}[tab]();
+ $('panel').innerHTML={parts:tabParts,colour:tabColour,weave:tabWeave,text:tabText,shape:tabShape,spiral:tabSpiral,lat:tabLat,out:tabOut}[tab]();
  bindPad();
  $('pp').textContent=playing?'⏸':t2('▶ Film','▶ Film');$('sub').textContent=t2('— parçalardan motif, motiften kumaş','— parts into motif, motif into cloth');
  updateDerived();
@@ -397,7 +470,7 @@ const slug=()=>proj.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-
 // ───────────── transport ─────────────
 function showFilm(t){mode='film';now=clamp(t,0,TL.total);frame(now);$('seek').value=Math.round(now/TL.total*1000);const s=Math.floor(now);$('tm').textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
 let last=performance.now();
-function loop(ts){const dt=Math.min(.1,(ts-last)/1000);last=ts;if(mode==='lat'&&lat.anim){lat.t+=dt;drawLat();}if(playing&&mode==='film'){if(now>=TL.total){playing=false;$('pp').textContent=t2('▶ Film','▶ Film');if(rec){rec.stop();rec=null;}}else showFilm(now+dt);}requestAnimationFrame(loop);}
+function loop(ts){const dt=Math.min(.1,(ts-last)/1000);last=ts;if(mode==='lat'&&lat.anim){lat.t+=dt;drawLat();}if(mode==='spi'&&spi.play){spi.t+=dt;drawSpiral();}if(mode==='steps'&&playing){if(now>=stepsTotal()){playing=false;$('pp').textContent=t2('▶ Film','▶ Film');if(rec){rec.stop();rec=null;}}else showSteps(now+dt);}if(playing&&mode==='film'){if(now>=TL.total){playing=false;$('pp').textContent=t2('▶ Film','▶ Film');if(rec){rec.stop();rec=null;}}else showFilm(now+dt);}requestAnimationFrame(loop);}
 function play(){if(!proj.layers.length){toast(t2('Önce parça ekleyin','Add a part first'));return;}if(mode!=='film'||now>=TL.total)now=0;mode='film';playing=!playing;$('pp').textContent=playing?'⏸':t2('▶ Film','▶ Film');if(!playing)showFilm(now);}
 function record(){
  if(!window.MediaRecorder){toast(t2('Bu tarayıcı kayıt desteklemiyor','Recording is not supported in this browser'));return;}
@@ -411,7 +484,7 @@ function record(){
 const move=(i,d)=>{const j=i+d;if(j<0||j>=proj.layers.length)return;[proj.layers[i],proj.layers[j]]=[proj.layers[j],proj.layers[i]];sel=j;};
 document.addEventListener('click',e=>{
  const el=e.target.closest('[data-act]');if(!el||el.tagName==='SELECT'||el.type==='checkbox')return;const a=el.dataset.act,i=+el.dataset.i,key=el.dataset.key;
- if(a==='tab'){tab=key;if(key==='lat'){mode='lat';playing=false;}else if(key==='shape'){mode='shp';playing=false;}else if(mode==='lat'||mode==='shp'){mode='edit';}renderPanel();redrawSoon();return;}
+ if(a==='tab'){tab=key;{const MO={lat:'lat',shape:'shp',spiral:'spi'};if(MO[key]){mode=MO[key];playing=false;}else if(['lat','shp','spi','steps'].includes(mode)){mode='edit';playing=false;}}renderPanel();redrawSoon();return;}
  if(a==='add'){const l=newLayer(el.dataset.part,{size:proj.layers.length?220:320});proj.layers.push(l);sel=proj.layers.length-1;changed(true);return;}
  if(a==='sel'){sel=i;mode='edit';renderPanel();redrawSoon();return;}
  if(a==='up'){move(i,-1);changed(true);return;}if(a==='dn'){move(i,1);changed(true);return;}
@@ -422,6 +495,9 @@ document.addEventListener('click',e=>{
  if(a==='gundo'){proj.gen.pts.pop();genChanged();renderPanel();redrawSoon();save();return;}
  if(a==='gclear'){proj.gen.pts=[];genChanged();renderPanel();redrawSoon();save();return;}
  if(a==='gadd'){if(!proj.gen.pts.length)return;genChanged();proj.layers.push(newLayer('c_custom',{size:320}));sel=proj.layers.length-1;tab='parts';changed(true);toast(t2('Parça eklendi','Part added'));return;}
+ if(a==='steps'){playSteps(false);return;}
+ if(a==='recsteps'){playSteps(true);return;}
+ if(a==='snap'){snapshot();return;}
  if(a==='play'){play();return;}
  if(a==='cloth'){if(!proj.layers.length)return;playing=false;showFilm(TL.c+.5);$('pp').textContent=t2('▶ Film','▶ Film');return;}
  if(a==='rec'){record();return;}
@@ -433,7 +509,8 @@ document.addEventListener('click',e=>{
  if(a==='desccopy'){try{navigator.clipboard.writeText(describe());toast(t2('Kopyalandı','Copied'));}catch{}return;}
 });
 document.addEventListener('input',e=>{
- const el=e.target;if(el.dataset.g){const k=el.dataset.g;if(k==='preset'){const q=GPRE[el.value];if(q){proj.gen={pts:q.pts.map(a=>[...a]),alt:q.alt,arms:q.arms};}}else if(k==='alt')proj.gen.alt=el.checked;else if(k==='arms')proj.gen.arms=+el.value;else if(k==='n')shp.n=+el.value;genChanged();if(el.type==='range'){const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;const ns=document.querySelector('[data-g=n]');if(ns){ns.max=genMax();if(+ns.value>genMax()){ns.value=genMax();shp.n=genMax();}}}else renderPanel();drawPad();redrawSoon();save();return;}if(el.dataset.l){const k=el.dataset.l;lat[k]=el.type==='checkbox'?el.checked:(el.tagName==='SELECT'?el.value:+el.value);if(k==='theta'||k==='anim')lat.anim=k==='anim'?el.checked:false;const out=el.parentNode.querySelector('output');if(out)out.textContent=el.value;if(k==='theta'){const cb=document.querySelector('[data-l=anim]');if(cb)cb.checked=false;}drawLat();return;}
+ const el=e.target;if(el.dataset.s){const k=el.dataset.s;spi[k]=el.type==='checkbox'?(el.checked?1:0):+el.value;if(k==='play')spi.play=el.checked;const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;mode='spi';playing=false;drawSpiral();return;}
+ if(el.dataset.l||el.dataset.g){const M={l:'lat',g:'shp'};mode=el.dataset.l?'lat':'shp';playing=false;}if(el.dataset.g){const k=el.dataset.g;if(k==='preset'){const q=GPRE[el.value];if(q){proj.gen={pts:q.pts.map(a=>[...a]),alt:q.alt,arms:q.arms};}}else if(k==='alt')proj.gen.alt=el.checked;else if(k==='arms')proj.gen.arms=+el.value;else if(k==='n')shp.n=+el.value;genChanged();if(el.type==='range'){const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;const ns=document.querySelector('[data-g=n]');if(ns){ns.max=genMax();if(+ns.value>genMax()){ns.value=genMax();shp.n=genMax();}}}else renderPanel();drawPad();redrawSoon();save();return;}if(el.dataset.l){const k=el.dataset.l;lat[k]=el.type==='checkbox'?el.checked:(el.tagName==='SELECT'?el.value:+el.value);if(k==='theta'||k==='anim')lat.anim=k==='anim'?el.checked:false;const out=el.parentNode.querySelector('output');if(out)out.textContent=el.value;if(k==='theta'){const cb=document.querySelector('[data-l=anim]');if(cb)cb.checked=false;}drawLat();return;}
  const k=el.dataset.k,p=el.dataset.p,a=el.dataset.act,c=el.dataset.c;
  if(k){const l=proj.layers[sel];if(!l)return;l[k]=el.type==='checkbox'?el.checked:(k==='sym'?el.value:+el.value);const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;
   changed(k==='sym');if(k==='n'||k==='shift'){/* list label */ const nm=document.querySelector('#layers li.on .nm');if(nm)nm.textContent=`${sel+1}. ${PARTS[l.part].title} · n=${l.n}${l.sym!=='none'?' · '+l.sym:''}`;}return;}
