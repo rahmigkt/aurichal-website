@@ -6,6 +6,7 @@ import {clamp,smooth,inOut,outBack,mix,lum} from './film-core.js';
 import {WEAVES,WEAVE_ORDER,MOTIF_WEAVE,weaveFor,weaveTile} from './weave.js';
 import {HISTORIC,HISTORIC_ORDER,contrast} from './palettes.js';
 import {brocadeOver} from './cloth.js';
+import * as LAT from './lattice.js';
 
 const W=1080,H=1350,CX=540,CY=625,ROLES=['ink','accent','soft'];
 const SERIF='"Cormorant Garamond","Times New Roman",Georgia,serif',SANS='Poppins,system-ui,-apple-system,"Segoe UI",sans-serif',GOLD='#f2c14e',CORAL='#ff6b5e';
@@ -201,7 +202,7 @@ function drawEdit(tex){
  ctx.restore();
  if(!proj.layers.length){text(t2('Sağdan bir parça ekleyin ya da hazır örnek yükleyin','Add a part on the right or load an example'),CX,CY,34,'#fff',{align:'center',alpha:.6,style:'normal',font:SANS});}
 }
-function redraw(){if(mode==='film'){frame(now);return;}drawEdit(false);clearTimeout(texTimer);needTex=true;texTimer=setTimeout(()=>{if(mode==='edit'){drawEdit(true);needTex=false;}},450);}
+function redraw(){if(mode==='lat'){drawLat();return;}if(mode==='film'){frame(now);return;}drawEdit(false);clearTimeout(texTimer);needTex=true;texTimer=setTimeout(()=>{if(mode==='edit'){drawEdit(true);needTex=false;}},450);}
 let raf=0;const redrawSoon=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;redraw();});};
 
 // ───────────── persistence ─────────────
@@ -271,11 +272,53 @@ function tabOut(){
  <div class="hint">${t2('WebM kaydı gerçek zamanlıdır; bilgisayar yavaşsa kare atlayabilir. Sergi kalitesinde mp4 için proje dosyasını kaydedip bana gönderin.','WebM recording runs in real time and may drop frames on a slow computer. For exhibition-grade mp4, save the project file and send it to me.')}</div>
  <h3>${t2('Proje','Project')}</h3><div class="btns"><button data-act="savep">${t2('Projeyi kaydet (.json)','Save project (.json)')}</button><button data-act="loadp">${t2('Proje aç','Open project')}</button><button data-act="newp">${t2('Yeni','New')}</button></div><input type="file" id="file" accept=".json,application/json" hidden>`;
 }
+
+// ───────────── lattice tab (rotating hexagons) ─────────────
+const lat={size:3,shape:'triangle',type:'asanoha',theta:0,anim:true,dots:true,t:0,cycle:['ring','spokes','star','asanoha','web']};
+function drawLat(){
+ ctx=mctx;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.fillStyle='#f4f0e6';ctx.fillRect(0,0,W,H);
+ let th=lat.theta*Math.PI/180,type=lat.type;
+ if(lat.anim){const tl=LAT.timeline(lat.t,lat.cycle);th=tl.theta;type=tl.type;}
+ const g=LAT.build({size:lat.size,shape:lat.shape,type,theta:th}),sc=Math.min(900/(lat.size*3.4+2.4),120);
+ ctx.save();ctx.translate(CX,CY+(lat.shape==='triangle'?0:0));ctx.scale(sc,-sc);
+ ctx.strokeStyle='#141210';ctx.lineWidth=2.4/sc;ctx.lineCap='round';ctx.beginPath();for(const e of g.edges){ctx.moveTo(e[0],e[1]);ctx.lineTo(e[2],e[3]);}ctx.stroke();
+ if(lat.dots){ctx.fillStyle='#141210';for(const d of g.dots){ctx.beginPath();ctx.arc(d[0],d[1],7/sc,0,7);ctx.fill();}}
+ ctx.restore();
+ const st=LAT.stats(g);ctx.fillStyle='#6d644f';ctx.font='26px Poppins,system-ui,sans-serif';ctx.textAlign='left';
+ ctx.fillText(`${LAT.TYPES[type].en} · θ = ${(th/Math.PI*180%360).toFixed(1)}°`,70,100);ctx.fillText(`${st.dots} dots · ${st.edges} edges`,70,140);
+ const o=$('latinfo');if(o)o.textContent=`${st.dots} ${t2('nokta','dots')} · ${st.edges} ${t2('çizgi','lines')} · ${t2('uzunluklar (L)','lengths (L)')}: ${st.lens.map(l=>l[0]).join(', ')}`;
+}
+function tabLat(){
+ const o=(obj,cur)=>Object.entries(obj).map(([k,v])=>`<option value="${k}" ${k===cur?'selected':''}>${lang==='tr'?v.tr:v.en}</option>`).join('');
+ return `<h3>${t2('Dönen altıgen kafes','Rotating hexagon lattice')}</h3><div class="hint">${t2('Fazlıoğlu animasyonundan: üçgen kafes üzerinde noktalar ve çizgiler. Altıgenler kendi merkezleri etrafında döner; her 30° dönüşte desen kafesle yeniden hizalanır.','From the Fazlıoğlu animation: dots and lines on a triangular lattice. Hexagons turn about their own centres; every 30° the pattern realigns with the lattice.')}</div>
+ <div class="ctl2"><label>${t2('Kalıp','Tile')}</label><select data-l="type">${o(LAT.TYPES,lat.type)}</select></div>
+ <div class="ctl2"><label>${t2('Biçim','Shape')}</label><select data-l="shape">${o(LAT.SHAPES,lat.shape)}</select></div>
+ <div class="ctl"><label>${t2('Boyut','Size')}</label><input type="range" data-l="size" min="1" max="6" step="1" value="${lat.size}"><output>${lat.size}</output></div>
+ <div class="ctl"><label>θ (°)</label><input type="range" data-l="theta" min="0" max="60" step=".5" value="${lat.theta}"><output>${lat.theta}</output></div>
+ <div class="hint"><label><input type="checkbox" data-l="anim" ${lat.anim?'checked':''}> ${t2('Canlandır (tüm kalıplar sırayla, 1 sn duruş)','Animate (all tiles in turn, 1 s holds)')}</label> &nbsp; <label><input type="checkbox" data-l="dots" ${lat.dots?'checked':''}> ${t2('Noktalar','Dots')}</label></div>
+ <div class="hint" id="latinfo"></div>
+ <h3>${t2('Matematik','Mathematics')}</h3><div class="desc">${t2(
+`Birim L = kafesteki en yakın iki nokta arası (videoda 92,9 px, hep sabit).
+Merkezler: c(i,j) = √3·(i·e30° + j·e90°)
+Köşeler: vₘ = c + R(θ)·(cos 60°m, sin 60°m), m = 0…5
+Çizgi uzunlukları: kenar/ışın = 1, kısa köşegen = √3, çap = 2.
+θ = 0° ve 30°'de köşeler 0°/60° ya da 30° döndürülmüş kafese oturur.
+θ(t): 1 sn duruş, 1,4 sn yumuşak dönüş (3x²−2x³), her duruşta kalıp değişir.
+Kesin: duruş desenlerinin kafes yapısı. Yaklaşık: geçişler (orijinalde noktalar ikiye bölünüp birleşiyor).`,
+`Unit L = nearest-neighbour distance of the lattice (92.9 px in the video, constant).
+Centres: c(i,j) = √3·(i·e30° + j·e90°)
+Vertices: vₘ = c + R(θ)·(cos 60°m, sin 60°m), m = 0…5
+Line lengths: side/spoke = 1, short diagonal = √3, diameter = 2.
+At θ = 0° and 30° the vertices sit on the 0°/60° lattice or the lattice turned 30°.
+θ(t): 1 s hold, 1.4 s smooth turn (3x²−2x³), tile changes at each hold.
+Exact: the lattice structure of the hold patterns. Approximate: the transitions (in the original, dots split and merge).`)}</div>
+ <div class="btns"><button data-act="png">PNG</button></div>`;
+}
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-const TABS=[['parts','Parçalar','Parts'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['out','Çıktı','Output']];
+const TABS=[['parts','Parçalar','Parts'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['lat','Kafes','Lattice'],['out','Çıktı','Output']];
 function renderPanel(){
  $('tabs').innerHTML=TABS.map(([k,a,b])=>`<button data-act="tab" data-key="${k}" class="${tab===k?'on':''}">${t2(a,b)}</button>`).join('');
- $('panel').innerHTML={parts:tabParts,colour:tabColour,weave:tabWeave,text:tabText,out:tabOut}[tab]();
+ $('panel').innerHTML={parts:tabParts,colour:tabColour,weave:tabWeave,text:tabText,lat:tabLat,out:tabOut}[tab]();
  $('pp').textContent=playing?'⏸':t2('▶ Film','▶ Film');$('sub').textContent=t2('— parçalardan motif, motiften kumaş','— parts into motif, motif into cloth');
  updateDerived();
 }
@@ -287,7 +330,7 @@ const slug=()=>proj.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-
 // ───────────── transport ─────────────
 function showFilm(t){mode='film';now=clamp(t,0,TL.total);frame(now);$('seek').value=Math.round(now/TL.total*1000);const s=Math.floor(now);$('tm').textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;}
 let last=performance.now();
-function loop(ts){const dt=Math.min(.1,(ts-last)/1000);last=ts;if(playing&&mode==='film'){if(now>=TL.total){playing=false;$('pp').textContent=t2('▶ Film','▶ Film');if(rec){rec.stop();rec=null;}}else showFilm(now+dt);}requestAnimationFrame(loop);}
+function loop(ts){const dt=Math.min(.1,(ts-last)/1000);last=ts;if(mode==='lat'&&lat.anim){lat.t+=dt;drawLat();}if(playing&&mode==='film'){if(now>=TL.total){playing=false;$('pp').textContent=t2('▶ Film','▶ Film');if(rec){rec.stop();rec=null;}}else showFilm(now+dt);}requestAnimationFrame(loop);}
 function play(){if(!proj.layers.length){toast(t2('Önce parça ekleyin','Add a part first'));return;}if(mode!=='film'||now>=TL.total)now=0;mode='film';playing=!playing;$('pp').textContent=playing?'⏸':t2('▶ Film','▶ Film');if(!playing)showFilm(now);}
 function record(){
  if(!window.MediaRecorder){toast(t2('Bu tarayıcı kayıt desteklemiyor','Recording is not supported in this browser'));return;}
@@ -301,7 +344,7 @@ function record(){
 const move=(i,d)=>{const j=i+d;if(j<0||j>=proj.layers.length)return;[proj.layers[i],proj.layers[j]]=[proj.layers[j],proj.layers[i]];sel=j;};
 document.addEventListener('click',e=>{
  const el=e.target.closest('[data-act]');if(!el||el.tagName==='SELECT'||el.type==='checkbox')return;const a=el.dataset.act,i=+el.dataset.i,key=el.dataset.key;
- if(a==='tab'){tab=key;renderPanel();return;}
+ if(a==='tab'){tab=key;if(key==='lat'){mode='lat';playing=false;}else if(mode==='lat'){mode='edit';}renderPanel();redrawSoon();return;}
  if(a==='add'){const l=newLayer(el.dataset.part,{size:proj.layers.length?220:320});proj.layers.push(l);sel=proj.layers.length-1;changed(true);return;}
  if(a==='sel'){sel=i;mode='edit';renderPanel();redrawSoon();return;}
  if(a==='up'){move(i,-1);changed(true);return;}if(a==='dn'){move(i,1);changed(true);return;}
@@ -320,7 +363,8 @@ document.addEventListener('click',e=>{
  if(a==='desccopy'){try{navigator.clipboard.writeText(describe());toast(t2('Kopyalandı','Copied'));}catch{}return;}
 });
 document.addEventListener('input',e=>{
- const el=e.target,k=el.dataset.k,p=el.dataset.p,a=el.dataset.act,c=el.dataset.c;
+ const el=e.target;if(el.dataset.l){const k=el.dataset.l;lat[k]=el.type==='checkbox'?el.checked:(el.tagName==='SELECT'?el.value:+el.value);if(k==='theta'||k==='anim')lat.anim=k==='anim'?el.checked:false;const out=el.parentNode.querySelector('output');if(out)out.textContent=el.value;if(k==='theta'){const cb=document.querySelector('[data-l=anim]');if(cb)cb.checked=false;}drawLat();return;}
+ const k=el.dataset.k,p=el.dataset.p,a=el.dataset.act,c=el.dataset.c;
  if(k){const l=proj.layers[sel];if(!l)return;l[k]=el.type==='checkbox'?el.checked:(k==='sym'?el.value:+el.value);const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;
   changed(k==='sym');if(k==='n'||k==='shift'){/* list label */ const nm=document.querySelector('#layers li.on .nm');if(nm)nm.textContent=`${sel+1}. ${PARTS[l.part].title} · n=${l.n}${l.sym!=='none'?' · '+l.sym:''}`;}return;}
  if(p){proj[p]=el.type==='checkbox'?el.checked:(el.type==='range'?+el.value:el.value);const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;changed(p==='repeat');return;}
