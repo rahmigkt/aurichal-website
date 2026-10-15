@@ -1,7 +1,8 @@
 // NAKIŞ Studio — compose a motif from parts, dye it, weave it, film it.
 import {MOTIFS} from './motifs.js';
 import {RULES,build as buildCurve} from './iter-core.js';
-import {L} from './prim.js';
+import {L,S} from './prim.js';
+import * as IMG from './imgpart.js';
 import {clamp,smooth,inOut,outBack,mix,lum} from './film-core.js';
 import {WEAVES,WEAVE_ORDER,MOTIF_WEAVE,weaveFor,weaveTile} from './weave.js';
 import {HISTORIC,HISTORIC_ORDER,contrast} from './palettes.js';
@@ -47,7 +48,7 @@ let lang=(()=>{try{return localStorage.getItem('nakis-lang')||'tr';}catch{return
 const t2=(tr,en)=>lang==='tr'?tr:en;
 let uid=1;
 const newLayer=(part,o={})=>({id:uid++,part,n:PARTS[part].counts.at(-1),x:0,y:0,size:300,rot:0,flip:false,sym:'none',k:6,shift:0,visible:true,...o});
-const defaultProject=()=>({v:1,title:'Untitled Composition',subtitle:'A study in woven geometry',note:'',mark:'Hüseyin Rahmi Göktaş · Global Science Advancement',palette:'turkeyred',custom:{ground:'#7a1230',ink:'#f6e8d2',accent:'#f2c25a',soft:'#eba3b6'},weave:'twill22',cycle:false,repeat:'single',cell:300,pace:2.6,showcase:[],tex:true,gen:{pts:[[.5,.5]],alt:false,arms:4},layers:[]});
+const defaultProject=()=>({v:1,title:'Untitled Composition',subtitle:'A study in woven geometry',note:'',mark:'Hüseyin Rahmi Göktaş · Global Science Advancement',palette:'turkeyred',custom:{ground:'#7a1230',ink:'#f6e8d2',accent:'#f2c25a',soft:'#eba3b6'},weave:'twill22',cycle:false,repeat:'single',cell:300,pace:2.6,showcase:[],tex:true,gen:{pts:[[.5,.5]],alt:false,arms:4},img:null,layers:[]});
 let proj=defaultProject(),sel=0,tab='parts',mode='edit',now=0,playing=false,rec=null;
 
 const polar=(r,deg)=>({x:Math.round(r*Math.sin(deg*Math.PI/180)),y:-Math.round(r*Math.cos(deg*Math.PI/180))});
@@ -211,7 +212,7 @@ function drawEdit(tex){
  ctx.restore();
  if(!proj.layers.length){text(t2('Sağdan bir parça ekleyin ya da hazır örnek yükleyin','Add a part on the right or load an example'),CX,CY,34,'#fff',{align:'center',alpha:.6,style:'normal',font:SANS});}
 }
-function redraw(){if(mode==='spi'){drawSpiral();return;}if(mode==='shp'){drawShape();return;}if(mode==='lat'){drawLat();return;}if(mode==='film'){frame(now);return;}drawEdit(false);clearTimeout(texTimer);needTex=true;texTimer=setTimeout(()=>{if(mode==='edit'){drawEdit(true);needTex=false;}},450);}
+function redraw(){if(mode==='img'){drawImgPreview();return;}if(mode==='spi'){drawSpiral();return;}if(mode==='shp'){drawShape();return;}if(mode==='lat'){drawLat();return;}if(mode==='film'){frame(now);return;}drawEdit(false);clearTimeout(texTimer);needTex=true;texTimer=setTimeout(()=>{if(mode==='edit'){drawEdit(true);needTex=false;}},450);}
 let raf=0;const redrawSoon=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;redraw();});};
 
 // ───────────── persistence ─────────────
@@ -222,8 +223,9 @@ function loadProj(p){
  o.layers=(p.layers||[]).filter(l=>PARTS[l.part]).map(l=>{const b=newLayer(l.part);const r={...b,...l,id:uid++};if(!PARTS[r.part].counts.includes(r.n))r.n=PARTS[r.part].counts.at(-1);return r;});
  if(!HISTORIC[o.palette]&&o.palette!=='custom')o.palette='turkeyred';if(!WEAVES[o.weave])o.weave='twill22';if(!['single','halfdrop','grid'].includes(o.repeat))o.repeat='single';
  o.gen=(p.gen&&Array.isArray(p.gen.pts)&&p.gen.pts.length<=12)?{pts:p.gen.pts.map(q=>[+q[0]||0,+q[1]||0]),alt:!!p.gen.alt,arms:clamp(+p.gen.arms||4,1,8)}:d.gen;
+ o.img=(p.img&&p.img.data&&p.img.w&&p.img.h)?{data:p.img.data,w:+p.img.w,h:+p.img.h,levels:clamp(+p.img.levels||2,1,3),thr:(p.img.thr||[]).map(Number).slice(0,3),blur:clamp(+p.img.blur||0,0,8),minA:clamp(+p.img.minA||40,4,2000),eps:clamp(+p.img.eps||1.1,.3,4),invert:!!p.img.invert}:null;
  o.showcase=(o.showcase||[]).filter(k=>HISTORIC[k]);o.pace=clamp(+o.pace||2.6,1,8);o.cell=clamp(+o.cell||300,160,520);
- proj=o;sel=Math.min(sel,Math.max(0,o.layers.length-1));
+ proj=o;sel=Math.min(sel,Math.max(0,o.layers.length-1));imgGray=null;if(o.img)restoreImg();
 }
 function changed(structure){mode='edit';playing=false;rebuild();updateDerived();if(structure)renderPanel();redrawSoon();save();}
 
@@ -453,11 +455,52 @@ function snapshot(){
  finally{TARGET=null;SCL=1;}
  c.toBlob(b=>b&&download(b,`nakis-snapshot-${kind}-${Date.now()%1e6}.png`));
 }
+
+// ───────────── image tab: your picture / last video frame as a part ─────────────
+let imgGray=null,imgRGBA=null,vidEl=null;
+const IMGMAX=320;
+function imgShapes(){const m=proj.img;if(!m||!imgGray)return [];const ls=m.thr.slice(0,m.levels).sort((a,b)=>a-b);
+ return IMG.shapesFrom(imgGray,m.w,m.h,{levels:ls,blur:m.blur,minArea:m.minA,eps:m.eps,invert:m.invert,smooth:1});}
+const IMG_TONES=n=>n===1?['ink']:n===2?['soft','ink']:['soft','accent','ink'];
+PARTS.c_image={title:'Your Image',tag:'IMAGE',group:'fractal',counts:[1],blurb:'Shapes lifted from your picture by luminance levels',
+ build:()=>{const m=proj.img;if(!m||!imgGray)return [S('i0',[[-1,-1],[1,-1],[1,1],[-1,1]],'ink')];const tn=IMG_TONES(m.levels);
+  const sh=imgShapes();if(!sh.length)return [S('i0',[[-1,-1],[1,-1],[1,1],[-1,1]],'ink')];
+  return sh.map((q,i)=>S('i'+i,q.pts,q.hole?(q.level>0?tn[q.level-1]:'soft'):tn[q.level]));},
+ f:()=>['luminance levels → contours',`levels: ${proj.img?proj.img.levels:0}`,`shapes: ${imgShapes().length}`]};
+function imgChanged(){shapeCache.clear();normCache.clear();pcache.clear();}
+function loadImgSource(url,isVideo){
+ const done=(el,keep)=>{const sw=el.videoWidth||el.naturalWidth,sh=el.videoHeight||el.naturalHeight,k=Math.min(1,IMGMAX/Math.max(sw,sh)),w=Math.max(8,Math.round(sw*k)),h=Math.max(8,Math.round(sh*k)),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(el,0,0,w,h);
+  imgRGBA=x.getImageData(0,0,w,h).data;imgGray=IMG.grayOf(imgRGBA,w,h);const th=IMG.autoLevels(IMG.blur(imgGray,w,h,2),3);
+  if(keep&&proj.img)Object.assign(proj.img,{data:c.toDataURL('image/jpeg',.85),w,h,thr:th});else proj.img={data:c.toDataURL('image/jpeg',.85),w,h,levels:2,thr:th,blur:2,minA:40,eps:1.1,invert:false};imgChanged();mode='img';if(!keep)renderPanel();else{const im=document.querySelector('#panel img');if(im)im.src=proj.img.data;}redrawSoon();save();if(!isVideo)URL.revokeObjectURL(url);if(!keep)toast(t2(isVideo?'Son kare alındı':'Görsel yüklendi','Image loaded'));};
+ if(isVideo){const v=document.createElement('video');v.muted=true;v.preload='auto';v.src=url;v.onloadedmetadata=()=>{v.currentTime=Math.max(0,v.duration-.08);};vidEl=v;let first=true;v.onseeked=()=>{done(v,!first);first=false;};v.onerror=()=>toast(t2('Video açılamadı','Could not open the video'));}
+ else{vidEl=null;const i=new Image();i.onload=()=>done(i);i.onerror=()=>toast(t2('Görsel açılamadı','Could not open the image'));i.src=url;}
+}
+function restoreImg(){if(!proj.img)return;const i=new Image();i.onload=()=>{const c=document.createElement('canvas');c.width=proj.img.w;c.height=proj.img.h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(i,0,0);imgRGBA=x.getImageData(0,0,c.width,c.height).data;imgGray=IMG.grayOf(imgRGBA,c.width,c.height);imgChanged();rebuild();redrawSoon();};i.src=proj.img.data;}
+function drawImgPreview(){
+ ctx=mctx;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;const P=ST[1];ctx.fillStyle=P.ground;ctx.fillRect(0,0,W,H);
+ const m=proj.img;if(!m||!imgGray){ctx.fillStyle='#a79d88';ctx.font='32px Poppins,system-ui,sans-serif';ctx.textAlign='center';ctx.fillText(t2('Bir görsel ya da video yükleyin','Upload an image or a video'),CX,CY);return;}
+ const sc=Math.min(940/m.w,1000/m.h),tn=IMG_TONES(m.levels);ctx.save();ctx.translate(CX,CY);ctx.scale(sc,-sc);
+ for(const q of imgShapes()){ctx.fillStyle=P[q.hole?(q.level>0?tn[q.level-1]:'soft'):tn[q.level]]||P.ink;ctx.beginPath();q.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fill();}ctx.restore();
+ ctx.fillStyle=P.ink;ctx.globalAlpha=.6;ctx.font='24px Poppins,system-ui,sans-serif';ctx.textAlign='left';ctx.fillText(`${imgShapes().length} shapes · ${m.levels} level${m.levels>1?'s':''}`,70,100);ctx.globalAlpha=1;
+}
+function tabImg(){
+ const m=proj.img,r=(k,a,b,st,tr,en)=>m?`<div class="ctl"><label>${t2(tr,en)}</label><input type="range" data-im="${k}" min="${a}" max="${b}" step="${st}" value="${m[k]}"><output>${m[k]}</output></div>`:'';
+ const th=m?[0,1,2].slice(0,m.levels).map(i=>`<div class="ctl"><label>${t2('Eşik','Level')} ${i+1}</label><input type="range" data-im="thr${i}" min="5" max="250" step="1" value="${m.thr[i]??128}"><output>${m.thr[i]??128}</output></div>`).join(''):'';
+ return `<h3>${t2('Görselden parça','Part from an image')}</h3><div class="hint">${t2('Resim ya da video yükleyin; videoda son kare alınır. Parlaklık eşikleriyle şekiller çıkarılır ve Stüdyo parçası olur: simetri, tekrar, renk, dokuma ve film bunlara uygulanır.','Upload a picture or a video (the last frame is taken). Brightness levels lift shapes that become a Studio part: symmetry, repeat, colour, weave and film all apply.')}</div>
+ <div class="btns"><button class="pri" data-act="imgpick">${t2('Görsel / video seç','Choose image / video')}</button></div><input type="file" id="imgfile" accept="image/*,video/*" hidden>
+ ${vidEl?`<div class="ctl"><label>${t2('Video karesi','Video frame')}</label><input type="range" data-vid="1" min="0" max="1000" step="1" value="${vidEl.duration?Math.round(vidEl.currentTime/vidEl.duration*1000):1000}"><output></output></div><div class="hint">${t2('Son kare boş ya da beyazsa kaydırıcıyla başka bir kare seçin.','If the last frame is blank or white, pick another frame with the slider.')}</div>`:''}
+ ${m?`<img src="${m.data}" style="width:96px;border-radius:6px;float:right;margin-left:8px" alt="">
+ <div class="ctl"><label>${t2('Seviye sayısı','Levels')}</label><select data-im="levels"><option ${m.levels===1?'selected':''}>1</option><option ${m.levels===2?'selected':''}>2</option><option ${m.levels===3?'selected':''}>3</option></select></div>${th}
+ ${r('blur',0,8,1,'Yumuşatma','Blur')}${r('minA',4,1200,2,'Küçük lekeleri at','Drop small specks')}${r('eps',.3,4,.1,'Sadeleştirme','Simplify')}
+ <div class="hint"><label><input type="checkbox" data-im="invert" ${m.invert?'checked':''}> ${t2('Açık ve koyu yer değiştirsin','Swap light and dark')}</label></div>
+ <div class="btns"><button data-act="imgauto">${t2('Eşikleri otomatik bul','Find levels automatically')}</button><button class="pri" data-act="imgadd">${t2('Kompozisyona parça olarak ekle','Add to composition as a part')}</button></div>`:''}
+ <h3>${t2('Nasıl çalışır','How it works')}</h3><div class="desc">${t2('1) Görsel en çok 320 px\'e küçültülür, parlaklık Y = 0,2126R + 0,7152G + 0,0722B.\n2) Kutu bulanıklaştırma.\n3) Eşikler Otsu yöntemiyle: sınıflar arası varyansı en büyük yapan t.\n4) Marching squares ile her eşikte kapalı konturlar; Douglas–Peucker ile sadeleştirme, Chaikin ile yumuşatma.\n5) İçteki konturlar delik sayılır. Düşük eşik altta, yüksek eşik üstte boyanır (ruh, vurgu, yumuşak rolleriyle).','1) The picture is shrunk to at most 320 px; brightness Y = 0.2126R + 0.7152G + 0.0722B.\n2) Box blur.\n3) Levels by Otsu: the t that maximises between-class variance.\n4) Marching squares gives closed contours at each level; Douglas–Peucker simplifies, Chaikin smooths.\n5) Inner contours are holes. Low levels paint underneath, high levels on top (in the ink, accent and soft roles).')}</div>`;
+}
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-const TABS=[['parts','Parçalar','Parts'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['shape','Şekil','Shape'],['lat','Kafes','Lattice'],['spiral','Spiral','Spiral'],['out','Çıktı','Output']];
+const TABS=[['parts','Parçalar','Parts'],['colour','Renk','Colour'],['weave','Dokuma','Weave'],['text','Metin','Text'],['shape','Şekil','Shape'],['lat','Kafes','Lattice'],['spiral','Spiral','Spiral'],['img','Görsel','Image'],['out','Çıktı','Output']];
 function renderPanel(){
  $('tabs').innerHTML=TABS.map(([k,a,b])=>`<button data-act="tab" data-key="${k}" class="${tab===k?'on':''}">${t2(a,b)}</button>`).join('');
- $('panel').innerHTML={parts:tabParts,colour:tabColour,weave:tabWeave,text:tabText,shape:tabShape,spiral:tabSpiral,lat:tabLat,out:tabOut}[tab]();
+ $('panel').innerHTML={parts:tabParts,colour:tabColour,weave:tabWeave,text:tabText,shape:tabShape,spiral:tabSpiral,img:tabImg,lat:tabLat,out:tabOut}[tab]();
  bindPad();
  $('pp').textContent=playing?'⏸':t2('▶ Film','▶ Film');$('sub').textContent=t2('— parçalardan motif, motiften kumaş','— parts into motif, motif into cloth');
  updateDerived();
@@ -484,7 +527,7 @@ function record(){
 const move=(i,d)=>{const j=i+d;if(j<0||j>=proj.layers.length)return;[proj.layers[i],proj.layers[j]]=[proj.layers[j],proj.layers[i]];sel=j;};
 document.addEventListener('click',e=>{
  const el=e.target.closest('[data-act]');if(!el||el.tagName==='SELECT'||el.type==='checkbox')return;const a=el.dataset.act,i=+el.dataset.i,key=el.dataset.key;
- if(a==='tab'){tab=key;{const MO={lat:'lat',shape:'shp',spiral:'spi'};if(MO[key]){mode=MO[key];playing=false;}else if(['lat','shp','spi','steps'].includes(mode)){mode='edit';playing=false;}}renderPanel();redrawSoon();return;}
+ if(a==='tab'){tab=key;{const MO={lat:'lat',shape:'shp',spiral:'spi',img:'img'};if(MO[key]){mode=MO[key];playing=false;}else if(['lat','shp','spi','img','steps'].includes(mode)){mode='edit';playing=false;}}renderPanel();redrawSoon();return;}
  if(a==='add'){const l=newLayer(el.dataset.part,{size:proj.layers.length?220:320});proj.layers.push(l);sel=proj.layers.length-1;changed(true);return;}
  if(a==='sel'){sel=i;mode='edit';renderPanel();redrawSoon();return;}
  if(a==='up'){move(i,-1);changed(true);return;}if(a==='dn'){move(i,1);changed(true);return;}
@@ -495,6 +538,9 @@ document.addEventListener('click',e=>{
  if(a==='gundo'){proj.gen.pts.pop();genChanged();renderPanel();redrawSoon();save();return;}
  if(a==='gclear'){proj.gen.pts=[];genChanged();renderPanel();redrawSoon();save();return;}
  if(a==='gadd'){if(!proj.gen.pts.length)return;genChanged();proj.layers.push(newLayer('c_custom',{size:320}));sel=proj.layers.length-1;tab='parts';changed(true);toast(t2('Parça eklendi','Part added'));return;}
+ if(a==='imgpick'){$('imgfile').click();return;}
+ if(a==='imgauto'&&proj.img&&imgGray){const m=proj.img;m.thr=IMG.autoLevels(IMG.blur(imgGray,m.w,m.h,m.blur),3);imgChanged();renderPanel();redrawSoon();save();return;}
+ if(a==='imgadd'){if(!proj.img)return;imgChanged();proj.layers.push(newLayer('c_image',{size:340}));sel=proj.layers.length-1;tab='parts';changed(true);toast(t2('Parça eklendi','Part added'));return;}
  if(a==='steps'){playSteps(false);return;}
  if(a==='recsteps'){playSteps(true);return;}
  if(a==='snap'){snapshot();return;}
@@ -509,7 +555,7 @@ document.addEventListener('click',e=>{
  if(a==='desccopy'){try{navigator.clipboard.writeText(describe());toast(t2('Kopyalandı','Copied'));}catch{}return;}
 });
 document.addEventListener('input',e=>{
- const el=e.target;if(el.dataset.s){const k=el.dataset.s;spi[k]=el.type==='checkbox'?(el.checked?1:0):+el.value;if(k==='play')spi.play=el.checked;const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;mode='spi';playing=false;drawSpiral();return;}
+ const el=e.target;if(el.dataset.vid&&vidEl){vidEl.currentTime=Math.min(vidEl.duration-.04,el.value/1000*vidEl.duration);return;}if(el.dataset.im&&proj.img){const k=el.dataset.im,m=proj.img;if(k.startsWith('thr'))m.thr[+k.slice(3)]=+el.value;else if(k==='invert')m.invert=el.checked;else m[k]=+el.value;if(k==='levels')while(m.thr.length<m.levels)m.thr.push(128);const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;imgChanged();mode='img';playing=false;if(k==='levels')renderPanel();drawImgPreview();save();return;}if(el.dataset.s){const k=el.dataset.s;spi[k]=el.type==='checkbox'?(el.checked?1:0):+el.value;if(k==='play')spi.play=el.checked;const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;mode='spi';playing=false;drawSpiral();return;}
  if(el.dataset.l||el.dataset.g){const M={l:'lat',g:'shp'};mode=el.dataset.l?'lat':'shp';playing=false;}if(el.dataset.g){const k=el.dataset.g;if(k==='preset'){const q=GPRE[el.value];if(q){proj.gen={pts:q.pts.map(a=>[...a]),alt:q.alt,arms:q.arms};}}else if(k==='alt')proj.gen.alt=el.checked;else if(k==='arms')proj.gen.arms=+el.value;else if(k==='n')shp.n=+el.value;genChanged();if(el.type==='range'){const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;const ns=document.querySelector('[data-g=n]');if(ns){ns.max=genMax();if(+ns.value>genMax()){ns.value=genMax();shp.n=genMax();}}}else renderPanel();drawPad();redrawSoon();save();return;}if(el.dataset.l){const k=el.dataset.l;lat[k]=el.type==='checkbox'?el.checked:(el.tagName==='SELECT'?el.value:+el.value);if(k==='theta'||k==='anim')lat.anim=k==='anim'?el.checked:false;const out=el.parentNode.querySelector('output');if(out)out.textContent=el.value;if(k==='theta'){const cb=document.querySelector('[data-l=anim]');if(cb)cb.checked=false;}drawLat();return;}
  const k=el.dataset.k,p=el.dataset.p,a=el.dataset.act,c=el.dataset.c;
  if(k){const l=proj.layers[sel];if(!l)return;l[k]=el.type==='checkbox'?el.checked:(k==='sym'?el.value:+el.value);const o=el.parentNode.querySelector('output');if(o)o.textContent=el.value;
@@ -524,7 +570,7 @@ function loadFrom(p){const keep=proj;loadProj(p);const r=proj;proj=keep;return r
 $('lang').onclick=()=>{lang=lang==='tr'?'en':'tr';try{localStorage.setItem('nakis-lang',lang);}catch{}$('lang').textContent=lang==='tr'?'EN':'TR';renderPanel();redrawSoon();};
 $('pp').onclick=play;
 $('seek').oninput=e=>{playing=false;showFilm(e.target.value/1000*TL.total);};
-document.addEventListener('change',e=>{if(e.target.id==='file'){const f=e.target.files[0];if(!f)return;f.text().then(s=>{try{loadProj(JSON.parse(s));sel=0;changed(true);toast(t2('Proje yüklendi','Project loaded'));}catch{toast(t2('Dosya okunamadı','Could not read file'));}});e.target.value='';}});
+document.addEventListener('change',e=>{if(e.target.id==='imgfile'){const f=e.target.files[0];if(f)loadImgSource(URL.createObjectURL(f),f.type.startsWith('video'));e.target.value='';return;}if(e.target.id==='file'){const f=e.target.files[0];if(!f)return;f.text().then(s=>{try{loadProj(JSON.parse(s));sel=0;changed(true);toast(t2('Proje yüklendi','Project loaded'));}catch{toast(t2('Dosya okunamadı','Could not read file'));}});e.target.value='';}});
 // canvas: select, drag, wheel
 let drag=null;
 const pos=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width*W-CX,(e.clientY-r.top)/r.height*H-CY];};
@@ -548,7 +594,7 @@ window.studio={get project(){return proj;},presets:PRESETS,parts:PARTS,load:name
  if(q.get('preset')&&PRESETS[q.get('preset')]){loadProj(PRESETS[q.get('preset')]());ok=true;}
  if(q.get('p')){try{loadProj(await (await fetch(q.get('p'))).json());ok=true;}catch{}}
  if(!ok)loadProj(PRESETS.medallion());
- rebuild();renderPanel();
+ restoreImg();rebuild();renderPanel();
  if(q.get('t')!==null&&q.get('t')!==''&&q.get('t')!==undefined&&q.has('t'))showFilm(+q.get('t'));else drawEdit(false),redraw();
  requestAnimationFrame(ts=>{last=ts;loop(ts);});
 })();
